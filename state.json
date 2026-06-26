@@ -1,0 +1,10 @@
+{
+  "lastUpdated": "26 junio 2026",
+  "lastMonthAdded": "june-2026",
+  "members": [
+    { "name": "Mohammed", "paid": 230, "pending": 30,  "pendingMonths": ["junio"] },
+    { "name": "Abdullah", "paid": 260, "pending": 0,   "pendingMonths": [] },
+    { "name": "Asia",     "paid": 140, "pending": 120, "pendingMonths": ["marzo", "abril", "mayo", "junio"] },
+    { "name": "Fausia",   "paid": 200, "pending": 60,  "pendingMonths": ["mayo", "junio"] }
+  ]
+}
