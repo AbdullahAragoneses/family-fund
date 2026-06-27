@@ -101,7 +101,7 @@ function generateHTML(state) {
   <div class="doc">
     <div class="doc-header">
       <h1>Fondo Familiar</h1>
-      <div class="meta">Actualizado: ${state.lastUpdated} &nbsp;&middot;&nbsp; Aportaci&oacute;n mensual: 60 &euro; por persona</div>
+      <div class="meta">Actualizado: ${state.lastUpdated} &nbsp;&middot;&nbsp; Aportaci&oacute;n mensual: 30 &euro; por persona</div>
     </div>
     <table class="fund-table">
       <thead>
@@ -124,7 +124,7 @@ ${rows}
       </ul>
     </div>
     <div class="doc-footer">
-      <span>Fondo familiar &middot; Contribuci&oacute;n mensual 60 &euro;/persona</span>
+      <span>Fondo familiar &middot; Contribuci&oacute;n mensual 30 &euro;/persona</span>
       <span>4 miembros &middot; objetivo ${monthName} ${year}</span>
     </div>
   </div>
@@ -168,13 +168,13 @@ if (state.lastMonthAdded === monthKey) {
   console.log(`${monthKey} already added — skipping obligations update.`);
 } else {
   state.members.forEach(m => {
-    m.pending += 60;
+    m.pending += 30;
     m.pendingMonths.push(monthES);
   });
   state.lastMonthAdded = monthKey;
   state.lastUpdated    = `1 ${monthES} ${year}`;
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
-  console.log(`Added 60 € obligation for ${monthES} ${year} to all members.`);
+  console.log(`Added 30 € obligation for ${monthES} ${year} to all members.`);
 }
 
 fs.writeFileSync(path.join(__dirname, 'index.html'), generateHTML(state));
