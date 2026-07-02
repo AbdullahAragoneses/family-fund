@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fondo Familiar</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%237c5cff'/></svg>">
+<style>
+/* ── Fondo Familiar — same design system as MetalScout (aurora on white) ── */
+:root{
+  --bg:#ffffff; --bg2:#f5f5f7; --ink:#1d1d1f; --muted:#6e6e73; --line:#e6e6ec;
+  --a1:#7c5cff; --a2:#4f9dff; --a3:#22d3ee; --a4:#c66bff; --a5:#ff7ac6;
+  --aurora:linear-gradient(120deg,#7c5cff 0%,#4f9dff 38%,#22d3ee 68%,#c66bff 100%);
+  --green:#1a7f37; --green-bg:#e7f6ec; --red:#d70015; --red-bg:#fff0f1;
+  --amber:#8a6100; --amber-bg:#fff7e0;
+  --radius:20px; --shadow:0 10px 40px -12px rgba(28,28,40,.18);
+  --shadow-sm:0 2px 14px -6px rgba(28,28,40,.16);
+  --max:1080px;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+  color:var(--ink); background:transparent; line-height:1.47; -webkit-font-smoothing:antialiased;
+}
+a{color:var(--a2);text-decoration:none}
+button{font-family:inherit}
+.hidden{display:none !important}
+.grad{background:var(--aurora);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+  height:54px;padding:0 24px;background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid rgba(0,0,0,.06)}
+.brand{font-weight:600;font-size:19px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+.brand .dot{width:15px;height:15px;border-radius:50%;background:var(--aurora);box-shadow:0 0 14px rgba(124,92,255,.55)}
+.nav-right{display:flex;align-items:center;gap:18px;font-size:14px;color:var(--muted)}
+.nav-right a,.nav-right button{color:var(--ink);background:none;border:0;cursor:pointer;font-size:14px}
+.nav-right a:hover{color:var(--a2)}
+
+.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+.center{min-height:calc(100vh - 54px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px 24px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;cursor:pointer;
+  border-radius:980px;font-size:16px;font-weight:600;padding:12px 24px;color:#fff;
+  background:var(--aurora);background-size:160% 160%;transition:.22s;letter-spacing:-.01em;
+  box-shadow:0 8px 22px -8px rgba(124,92,255,.6)}
+.btn:hover{background-position:100% 0;transform:translateY(-1px);box-shadow:0 12px 28px -8px rgba(79,157,255,.6)}
+.btn:active{transform:translateY(0) scale(.99)}
+.btn[disabled]{opacity:.5;cursor:default;box-shadow:none}
+.btn.secondary{background:var(--bg2);color:var(--ink);box-shadow:none}
+.btn.secondary:hover{background:#ececef;transform:none}
+.btn.block{width:100%}
+
+/* cards */
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px}
+
+/* auth card */
+.auth{width:100%;max-width:390px;text-align:left}
+.auth h2{font-size:24px;letter-spacing:-.02em;margin:0 0 4px}
+.auth .sub{color:var(--muted);margin:0 0 22px;font-size:15px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.input,select.input{width:100%;border:1px solid var(--line);border-radius:13px;padding:13px 14px;font-size:16px;
+  background:#fff;color:var(--ink);transition:.15s;-webkit-appearance:none;appearance:none}
+.input:focus{outline:0;border-color:var(--a2);box-shadow:0 0 0 4px rgba(79,157,255,.16)}
+.msg{font-size:14px;border-radius:12px;padding:11px 14px;margin-bottom:10px}
+.msg.err{background:var(--red-bg);color:var(--red)} .msg.ok{background:var(--green-bg);color:var(--green)}
+
+/* app shell */
+.app{padding:34px 0 90px;animation:fade .5s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.apphead{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:26px}
+.apphead h1{font-size:28px;letter-spacing:-.02em;margin:0}
+.apphead .lead{margin:6px 0 0;color:var(--muted)}
+
+/* tabs */
+.tabs{display:flex;gap:4px;background:var(--bg2);padding:5px;border-radius:980px}
+.tab{border:0;background:none;padding:9px 20px;border-radius:980px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;transition:.18s}
+.tab.active{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
+.pane{animation:fade .4s ease both}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+.kpi::after{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--aurora)}
+.kpi .n{font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.1}
+.kpi .l{font-size:13px;color:var(--muted);margin-top:4px}
+.kpi.good .n{color:var(--green)} .kpi.bad .n{color:var(--red)}
+
+/* ledger table */
+.ltable{width:100%;border-collapse:collapse;font-size:14px}
+.ltable th,.ltable td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.ltable th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+.ltable tbody tr:hover{background:#fafaff}
+.ltable .amt{text-align:right;font-variant-numeric:tabular-nums}
+.ltable .x{color:var(--muted);cursor:pointer;background:none;border:0;font-size:15px}
+.ltable .x:hover{color:var(--red)}
+.scrollx{overflow-x:auto}
+.pill{display:inline-block;padding:3px 10px;border-radius:980px;font-size:12px;font-weight:600}
+.pill.ok{background:var(--green-bg);color:var(--green)}
+.pill.due{background:var(--amber-bg);color:var(--amber)}
+.empty{text-align:center;color:var(--muted);padding:44px 12px}
+.empty .ic{font-size:40px;margin-bottom:10px}
+.section-title{font-size:12px;color:var(--muted);font-weight:700;margin:28px 0 12px;text-transform:uppercase;letter-spacing:.05em}
+
+.loading{display:flex;align-items:center;gap:12px;justify-content:center;padding:42px;color:var(--muted);font-size:16px}
+.spin{width:20px;height:20px;border:2.5px solid rgba(0,0,0,.12);border-top-color:var(--a1);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.foot{border-top:1px solid var(--line);padding:26px 24px;text-align:center;color:var(--muted);font-size:12px;background:var(--bg2);margin-top:40px}
+
+@media(max-width:820px){.kpis{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.apphead{align-items:flex-start}.tabs{width:100%}.tab{flex:1}}
+</style>
+</head>
+<body>
+
+<!-- ░░ MAIN GATE (siblings) ░░ -->
+<section id="viewGate">
+  <div class="center">
+    <div class="card auth">
+      <h2>Fondo <span class="grad">Familiar</span></h2>
+      <p class="sub">Introduce la contraseña para ver el fondo.</p>
+      <div id="gateMsg"></div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input id="pwd-input" class="input" type="password" placeholder="••••" onkeydown="if(event.key==='Enter') checkPassword()">
+      </div>
+      <button class="btn block" onclick="checkPassword()">Entrar</button>
+    </div>
+  </div>
+</section>
+
+<!-- ░░ APP (siblings, logged in) ░░ -->
+<section id="viewApp" class="hidden">
+  <nav class="nav">
+    <div class="brand"><span class="dot"></span> Fondo Familiar</div>
+    <div class="nav-right">
+      <a href="#" id="navMaster">Vista maestra</a>
+      <button id="navSignout">Salir</button>
+    </div>
+  </nav>
+
+  <div class="wrap app">
+    <div class="apphead">
+      <div>
+        <h1>Resumen del fondo</h1>
+        <p class="lead" id="headerMeta"></p>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-pane="overview">Resumen</button>
+        <button class="tab" data-pane="deposit">Registrar Aporte</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-overview">
+      <div id="overview-content"><div class="loading"><span class="spin"></span> Cargando…</div></div>
+    </div>
+
+    <div class="pane hidden" id="pane-deposit">
+      <div class="card auth" style="max-width:420px">
+        <h2>Registrar aporte</h2>
+        <p class="sub">Elige tu nombre y registra lo que depositaste.</p>
+        <div id="depMsg"></div>
+        <div class="field">
+          <label>Miembro</label>
+          <select id="dep-name" class="input">
+            <option value="Mohammed">Mohammed</option>
+            <option value="Abdullah">Abdullah</option>
+            <option value="Asia">Asia</option>
+            <option value="Fausia">Fausia</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Monto (€)</label>
+          <input type="number" id="dep-amount" class="input" value="30" min="1" step="1">
+        </div>
+        <div class="field">
+          <label>Fecha</label>
+          <input type="date" id="dep-date" class="input">
+        </div>
+        <div class="field">
+          <label>Nota (opcional)</label>
+          <input type="text" id="dep-note" class="input" placeholder="ej. transferencia bancaria">
+        </div>
+        <button class="btn block" id="dep-submit" onclick="submitDeposit()">Registrar aporte</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">Fondo familiar · 30 €/persona al mes · 4 miembros</div>
+</section>
+
+<!-- ░░ MASTER GATE (Abdullah only) ░░ -->
+<section id="viewMasterGate" class="hidden">
+  <nav class="nav">
+    <div class="brand"><span class="dot"></span> Fondo Familiar · Maestro</div>
+    <div class="nav-right"><a href="#" id="masterBack">← App</a></div>
+  </nav>
+  <div class="center">
+    <div class="card auth">
+      <h2>Vista <span class="grad">maestra</span></h2>
+      <p class="sub">Acceso restringido. Introduce la contraseña de administrador.</p>
+      <div id="masterGateMsg"></div>
+      <div class="field">
+        <label>Contraseña de administrador</label>
+        <input id="master-pwd-input" class="input" type="password" placeholder="••••" onkeydown="if(event.key==='Enter') checkMasterPassword()">
+      </div>
+      <button class="btn block" onclick="checkMasterPassword()">Entrar</button>
+    </div>
+  </div>
+</section>
+
+<!-- ░░ MASTER VIEW (Abdullah only, unlocked) ░░ -->
+<section id="viewMaster" class="hidden">
+  <nav class="nav">
+    <div class="brand"><span class="dot"></span> Fondo Familiar · Maestro</div>
+    <div class="nav-right">
+      <a href="#" id="masterBack2">← App</a>
+      <button id="masterSignout">Salir del panel</button>
+    </div>
+  </nav>
+  <div class="wrap app">
+    <h1>Vista maestra</h1>
+    <p class="lead" style="color:var(--muted)">Cada cuenta, lo que falta por pagar, y el historial completo de aportes.</p>
+    <div id="master-content"><div class="loading"><span class="spin"></span> Cargando…</div></div>
+  </div>
+</section>
+
+<script>
+  const AUTH_KEY = 'familyFundAuth_v3';
+  const MASTER_AUTH_KEY = 'familyFundMasterAuth_v1';
+  const PWD = '1234';
+  const MASTER_PWD = '786';
+
+  function show(id) {
+    ['viewGate', 'viewApp', 'viewMasterGate', 'viewMaster'].forEach((v) => {
+      document.getElementById(v).classList.toggle('hidden', v !== id);
+    });
+  }
+
+  if (localStorage.getItem(AUTH_KEY) === 'yes') {
+    enterApp();
+  }
+
+  function checkPassword() {
+    const val = document.getElementById('pwd-input').value;
+    if (val === PWD) {
+      localStorage.setItem(AUTH_KEY, 'yes');
+      enterApp();
+    } else {
+      document.getElementById('gateMsg').innerHTML = '<div class="msg err">Contraseña incorrecta. Inténtalo de nuevo.</div>';
+      document.getElementById('pwd-input').value = '';
+      document.getElementById('pwd-input').focus();
+    }
+  }
+
+  function enterApp() {
+    show('viewApp');
+    document.getElementById('dep-date').valueAsDate = new Date();
+    loadData();
+  }
+
+  document.getElementById('navSignout').addEventListener('click', () => {
+    localStorage.removeItem(AUTH_KEY);
+    location.reload();
+  });
+
+  document.getElementById('navMaster').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (localStorage.getItem(MASTER_AUTH_KEY) === 'yes') {
+      enterMaster();
+    } else {
+      show('viewMasterGate');
+    }
+  });
+  document.getElementById('masterBack').addEventListener('click', (e) => { e.preventDefault(); show('viewApp'); });
+  document.getElementById('masterBack2').addEventListener('click', (e) => { e.preventDefault(); show('viewApp'); });
+  document.getElementById('masterSignout').addEventListener('click', () => {
+    localStorage.removeItem(MASTER_AUTH_KEY);
+    show('viewApp');
+  });
+
+  function checkMasterPassword() {
+    const val = document.getElementById('master-pwd-input').value;
+    if (val === MASTER_PWD) {
+      localStorage.setItem(MASTER_AUTH_KEY, 'yes');
+      enterMaster();
+    } else {
+      document.getElementById('masterGateMsg').innerHTML = '<div class="msg err">Contraseña incorrecta.</div>';
+      document.getElementById('master-pwd-input').value = '';
+      document.getElementById('master-pwd-input').focus();
+    }
+  }
+
+  function enterMaster() {
+    show('viewMaster');
+    loadData();
+  }
+
+  // Tabs (Resumen / Registrar Aporte)
+  document.querySelectorAll('.tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+      document.querySelectorAll('.pane').forEach((p) => p.classList.add('hidden'));
+      tab.classList.add('active');
+      document.getElementById('pane-' + tab.dataset.pane).classList.remove('hidden');
+    });
+  });
+
+  async function loadData() {
+    try {
+      const res = await fetch('/api/transactions');
+      const data = await res.json();
+      renderOverview(data);
+      renderMaster(data);
+    } catch (e) {
+      document.getElementById('overview-content').innerHTML = '<div class="empty"><div class="ic">⚠️</div>No se pudo cargar el fondo. Intenta de nuevo.</div>';
+      document.getElementById('master-content').innerHTML = '<div class="empty"><div class="ic">⚠️</div>No se pudo cargar el fondo.</div>';
+    }
+  }
+
+  function summarize(data) {
+    const byName = {};
+    data.members.forEach((m) => (byName[m] = 0));
+    data.transactions.forEach((t) => (byName[t.name] = (byName[t.name] || 0) + t.amount));
+    return data.members.map((m) => {
+      const paid = byName[m] || 0;
+      const pending = Math.max(0, data.obligation - paid);
+      return { name: m, paid, pending };
+    });
+  }
+
+  function fmt(n) { return n.toLocaleString('de-DE'); }
+
+  function renderOverview(data) {
+    const rows = summarize(data);
+    const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
+    const totalPending = rows.reduce((s, r) => s + r.pending, 0);
+    const upToDate = rows.filter((r) => r.pending === 0).length;
+
+    document.getElementById('headerMeta').textContent =
+      'Aportación mensual: 30 € por persona · obligación acumulada: ' + fmt(data.obligation) + ' € por persona';
+
+    let html = '<div class="kpis">'
+      + kpi(fmt(totalPaid) + ' €', 'Total recaudado', '')
+      + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
+      + kpi(fmt(totalPaid + totalPending) + ' €', 'Total una vez al día', '')
+      + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
+      + '</div>';
+
+    html += '<div class="card"><table class="ltable"><thead><tr><th>Nombre</th><th class="amt">Pagado</th><th class="amt">Estado</th></tr></thead><tbody>';
+    rows.forEach((r) => {
+      const pillHtml = r.pending === 0
+        ? '<span class="pill ok">Al día</span>'
+        : '<span class="pill due">Debe ' + fmt(r.pending) + ' €</span>';
+      html += '<tr><td>' + r.name + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + pillHtml + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+
+    document.getElementById('overview-content').innerHTML = html;
+  }
+
+  function kpi(n, l, cls) {
+    return '<div class="kpi ' + (cls || '') + '"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>';
+  }
+
+  function renderMaster(data) {
+    const rows = summarize(data);
+    const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
+    const totalPending = rows.reduce((s, r) => s + r.pending, 0);
+    const upToDate = rows.filter((r) => r.pending === 0).length;
+
+    let html = '<div class="kpis">'
+      + kpi(fmt(totalPaid) + ' €', 'Total recaudado', '')
+      + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
+      + kpi(data.transactions.length, 'Aportes registrados', '')
+      + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
+      + '</div>';
+
+    html += '<div class="section-title">Estado por persona</div>';
+    html += '<div class="card"><table class="ltable"><thead><tr><th>Nombre</th><th class="amt">Pagado</th><th class="amt">Pendiente</th><th class="amt">Estado</th></tr></thead><tbody>';
+    rows.forEach((r) => {
+      const pillHtml = r.pending === 0 ? '<span class="pill ok">Al día</span>' : '<span class="pill due">Debe</span>';
+      html += '<tr><td>' + r.name + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + (r.pending === 0 ? '—' : fmt(r.pending) + ' €') + '</td><td class="amt">' + pillHtml + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+
+    html += '<div class="section-title">Historial completo de aportes (' + data.transactions.length + ')</div>';
+    if (data.transactions.length === 0) {
+      html += '<div class="card"><div class="empty"><div class="ic">📭</div>No hay aportes registrados todavía.</div></div>';
+    } else {
+      const sorted = [...data.transactions].sort((a, b) => (a.date < b.date ? 1 : -1));
+      html += '<div class="card scrollx"><table class="ltable"><thead><tr><th>Fecha</th><th>Nombre</th><th class="amt">Monto</th><th>Nota</th><th></th></tr></thead><tbody>';
+      sorted.forEach((t) => {
+        html += '<tr>'
+          + '<td>' + t.date + '</td>'
+          + '<td>' + t.name + '</td>'
+          + '<td class="amt">' + fmt(t.amount) + ' €</td>'
+          + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
+          + '<td><button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button></td>'
+          + '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    document.getElementById('master-content').innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  async function submitDeposit() {
+    const name = document.getElementById('dep-name').value;
+    const amount = document.getElementById('dep-amount').value;
+    const date = document.getElementById('dep-date').value;
+    const note = document.getElementById('dep-note').value;
+    const btn = document.getElementById('dep-submit');
+    const msg = document.getElementById('depMsg');
+
+    btn.disabled = true;
+    msg.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, amount, date, note }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error al registrar el aporte');
+
+      msg.innerHTML = '<div class="msg ok">Aporte de ' + amount + ' € registrado para ' + name + '.</div>';
+      document.getElementById('dep-note').value = '';
+      await loadData();
+    } catch (e) {
+      msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function deleteTransaction(id) {
+    if (!confirm('¿Eliminar este aporte del historial?')) return;
+    try {
+      await fetch('/api/transactions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      await loadData();
+    } catch (e) {
+      alert('No se pudo eliminar: ' + e.message);
+    }
+  }
+</script>
+</body>
+</html>
