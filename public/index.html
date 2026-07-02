@@ -558,10 +558,10 @@ button{font-family:inherit}
     const container = document.getElementById(containerId);
     if (!container || points.length === 0) return;
 
-    const W = 700, H = 220, padL = 44, padR = 16, padT = 16, padB = 28;
+    const W = 700, H = 220, padL = 44, padR = 16, padT = 30, padB = 28;
     const plotW = W - padL - padR, plotH = H - padT - padB;
 
-    const maxVal = Math.max(...points.map((p) => p.total), 1) * 1.15;
+    const maxVal = Math.max(...points.map((p) => p.total), 1) * 1.35;
     const useIndexScale = new Set(points.map((p) => p.date)).size < 3 || points.every((p) => p.date === points[0].date);
 
     let xs;
@@ -605,7 +605,7 @@ button{font-family:inherit}
       + '<path d="' + areaPath + '" fill="url(#areaGrad)" stroke="none"/>'
       + '<path d="' + linePath + '" fill="none" stroke="url(#lineGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
       + '<circle cx="' + lastX + '" cy="' + lastY + '" r="5" fill="#7c5cff" stroke="#fff" stroke-width="2"/>'
-      + '<text x="' + Math.min(lastX, W - padR - 4) + '" y="' + Math.max(lastY - 12, 12) + '" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">' + fmt(points[points.length - 1].total) + ' €</text>'
+      + '<text x="' + Math.min(lastX, W - padR - 4) + '" y="' + Math.max(lastY - 14, padT - 6) + '" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">' + fmt(points[points.length - 1].total) + ' €</text>'
       + '<circle id="hoverDot" cx="0" cy="0" r="5" fill="#7c5cff" stroke="#fff" stroke-width="2" style="opacity:0"/>'
       + '<line id="hoverLine" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + plotH) + '" stroke="var(--line)" stroke-width="1" style="opacity:0"/>'
       + '<rect x="' + padL + '" y="0" width="' + plotW + '" height="' + H + '" fill="transparent" id="hoverCatcher" style="cursor:crosshair"/>'
