@@ -151,10 +151,25 @@ button{font-family:inherit}
 .goal-card .sub-line{color:var(--muted);font-size:14px;margin-bottom:18px}
 .goal-hit{background:linear-gradient(120deg,#faf8ff,#eef5ff);border-radius:16px;padding:14px 18px;margin-top:16px;
   display:flex;align-items:center;gap:10px;font-weight:600;color:var(--a1)}
+.goal-projection{background:var(--bg2);border-radius:12px;padding:10px 14px;margin-top:14px;font-size:13px;color:var(--muted)}
 .goal-numbers{display:flex;justify-content:space-between;margin-top:10px;font-size:13px;color:var(--muted)}
 .goal-numbers b{color:var(--ink);font-variant-numeric:tabular-nums}
 .goal-empty{text-align:center;padding:20px 12px}
 .goal-empty .ic{font-size:38px;margin-bottom:8px}
+
+/* help modal — TEMPORARY, remove nav button + this modal once siblings are onboarded */
+.modal{position:fixed;inset:0;z-index:200;background:rgba(20,20,30,.4);backdrop-filter:blur(5px);
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.modal .sheet{background:#fff;border-radius:24px;max-width:440px;width:100%;padding:28px;box-shadow:var(--shadow);max-height:85vh;overflow-y:auto}
+.modal .sheet h2{font-size:20px;letter-spacing:-.02em;margin:0 0 4px}
+.modal .sheet .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+.help-steps{list-style:none;counter-reset:step;padding:0;margin:0 0 18px;display:flex;flex-direction:column;gap:12px}
+.help-steps li{counter-increment:step;display:flex;gap:12px;font-size:14.5px;line-height:1.4}
+.help-steps li::before{content:counter(step);flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--aurora);
+  color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.help-pwd{background:var(--bg2);border-radius:14px;padding:14px 16px;text-align:center;margin-bottom:18px}
+.help-pwd .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.help-pwd .v{font-size:22px;font-weight:700;letter-spacing:.08em;margin-top:4px}
 
 @media(max-width:820px){.kpis{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){
@@ -200,10 +215,32 @@ button{font-family:inherit}
   <nav class="nav">
     <div class="brand"><span class="dot"></span> Fondo Familiar</div>
     <div class="nav-right">
+      <a href="#" id="navHelp">Instrucciones</a>
       <a href="#" id="navMaster">Vista maestra</a>
       <button id="navSignout">Salir</button>
     </div>
   </nav>
+
+  <!-- TEMPORARY: help modal for siblings — remove this block + #navHelp above once everyone's onboarded -->
+  <div id="helpModal" class="modal hidden">
+    <div class="sheet">
+      <h2>Cómo usar el Fondo Familiar</h2>
+      <p class="sub">Guía rápida para registrar tus aportes.</p>
+      <div class="help-pwd">
+        <div class="l">Contraseña de la app</div>
+        <div class="v">1234</div>
+      </div>
+      <ul class="help-steps">
+        <li>Entra a la app con la contraseña de arriba.</li>
+        <li>Ve a la pestaña <b>«Registrar Aporte»</b>.</li>
+        <li>Elige tu nombre y escribe el monto que depositaste.</li>
+        <li>Adjunta una foto o captura del comprobante de la transferencia.</li>
+        <li>Presiona <b>«Registrar aporte»</b> — ¡listo!</li>
+      </ul>
+      <p class="sub" style="margin-bottom:16px">En «Resumen» pueden ver el total del fondo y quién está al día.</p>
+      <button class="btn block" onclick="document.getElementById('helpModal').classList.add('hidden')">Entendido</button>
+    </div>
+  </div>
 
   <div class="wrap app">
     <div class="apphead">
@@ -341,6 +378,11 @@ button{font-family:inherit}
     location.reload();
   });
 
+  document.getElementById('navHelp').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('helpModal').classList.remove('hidden');
+  });
+
   document.getElementById('navMaster').addEventListener('click', (e) => {
     e.preventDefault();
     if (localStorage.getItem(MASTER_AUTH_KEY) === 'yes') {
@@ -400,85 +442,133 @@ button{font-family:inherit}
     }
   }
 
-  function renderMeta(data) {
-    const totalPaid = data.transactions.reduce((s, t) => s + t.amount, 0);
-    const el = document.getElementById('meta-content');
-    const goal = data.goal;
+  const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  let goalFormMode = null; // null = closed, 'add' = new-goal form, or a goal id = editing that goal
 
-    if (!goal) {
-      el.innerHTML = '<div class="card auth" style="max-width:440px">'
-        + '<div class="goal-empty"><div class="ic">🎯</div>'
-        + '<h2 style="margin-bottom:6px">Todavía no hay una meta</h2>'
-        + '<p class="sub" style="margin-bottom:0">Define en qué quieren usar el fondo — por ejemplo, un regalo para papá — y aquí verán cuánto falta según los aportes reales.</p></div>'
-        + goalForm(null)
-        + '</div>';
-    } else {
-      const pct = Math.min(100, (totalPaid / goal.target) * 100);
-      const remaining = Math.max(0, goal.target - totalPaid);
-      const reached = totalPaid >= goal.target;
-      el.innerHTML = '<div class="card goal-card" style="max-width:520px">'
-        + '<div class="name">' + escapeHtml(goal.name) + '</div>'
-        + '<div class="sub-line">Meta: ' + fmt(goal.target) + ' €</div>'
-        + '<div class="meter-row"><span>Progreso</span><span class="pct">' + Math.round(pct) + '%</span></div>'
-        + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
-        + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(totalPaid) + ' €</b></span><span>' + (reached ? 'Sobrante: <b>' + fmt(totalPaid - goal.target) + ' €</b>' : 'Falta: <b>' + fmt(remaining) + ' €</b>') + '</span></div>'
-        + (reached ? '<div class="goal-hit">🎉 &nbsp;¡Meta alcanzada! Ya tienen fondos suficientes.</div>' : '')
-        + '<div id="goalActionMsg"></div>'
-        + '<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px;display:flex;gap:10px;flex-wrap:wrap">'
-        + '<button class="btn secondary" onclick="toggleGoalForm()" id="editGoalBtn">Editar meta</button>'
-        + '<button class="btn secondary" style="color:var(--red)" onclick="deleteGoal()">Eliminar meta</button>'
-        + '</div>'
-        + '<div id="goalFormWrap" class="hidden" style="margin-top:16px">' + goalForm(goal) + '</div>'
-        + '</div>';
-    }
+  function projectGoal(remaining, monthlyRate) {
+    if (!monthlyRate || monthlyRate <= 0) return null;
+    const monthsToGo = Math.ceil(remaining / monthlyRate);
+    const target = new Date();
+    target.setMonth(target.getMonth() + monthsToGo);
+    return { monthsToGo, dateLabel: MONTHS_ES[target.getMonth()] + ' ' + target.getFullYear() };
   }
 
-  function goalForm(goal) {
+  function goalCardHtml(goal, totalPaid, monthlyRate) {
+    const pct = Math.min(100, (totalPaid / goal.target) * 100);
+    const remaining = Math.max(0, goal.target - totalPaid);
+    const reached = totalPaid >= goal.target;
+    let extraLine = '';
+    if (reached) {
+      extraLine = '<div class="goal-hit">🎉 &nbsp;¡Meta alcanzada! Ya tienen fondos suficientes.</div>';
+    } else {
+      const proj = projectGoal(remaining, monthlyRate);
+      extraLine = proj
+        ? '<div class="goal-projection">📈 Al ritmo actual de aportes (' + fmt(monthlyRate) + ' €/mes), faltarían aprox. '
+          + proj.monthsToGo + (proj.monthsToGo === 1 ? ' mes' : ' meses') + ' — hacia ' + proj.dateLabel + '.</div>'
+        : '';
+    }
+    return '<div class="card goal-card" style="max-width:520px;margin-bottom:18px">'
+      + '<div class="name">' + escapeHtml(goal.name) + '</div>'
+      + '<div class="sub-line">Meta: ' + fmt(goal.target) + ' €</div>'
+      + '<div class="meter-row"><span>Progreso</span><span class="pct">' + Math.round(pct) + '%</span></div>'
+      + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
+      + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(totalPaid) + ' €</b></span><span>' + (reached ? 'Sobrante: <b>' + fmt(totalPaid - goal.target) + ' €</b>' : 'Falta: <b>' + fmt(remaining) + ' €</b>') + '</span></div>'
+      + extraLine
+      + '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px;display:flex;gap:10px;flex-wrap:wrap">'
+      + '<button class="btn secondary" onclick="openEditGoalForm(\'' + goal.id + '\')">Editar</button>'
+      + '<button class="btn secondary" style="color:var(--red)" onclick="deleteGoal(\'' + goal.id + '\')">Eliminar</button>'
+      + '</div>'
+      + (goalFormMode === goal.id ? '<div style="margin-top:16px">' + goalFormHtml(goal) + '</div>' : '')
+      + '</div>';
+  }
+
+  function goalFormHtml(goal) {
     const name = goal ? escapeHtml(goal.name).replace(/"/g, '&quot;') : '';
     const target = goal ? goal.target : '';
+    const id = goal ? goal.id : '';
     return '<div id="goalMsg"></div>'
       + '<div class="field"><label>Nombre de la meta</label>'
-      + '<input id="goal-name" class="input" type="text" placeholder="ej. Teléfono nuevo para papá" value="' + name + '"></div>'
+      + '<input id="goal-name-input" class="input" type="text" placeholder="ej. Teléfono nuevo para papá" value="' + name + '"></div>'
       + '<div class="field"><label>Monto objetivo (€)</label>'
-      + '<input id="goal-target" class="input" type="number" min="1" step="1" value="' + target + '"></div>'
-      + '<button class="btn block" onclick="submitGoal()">' + (goal ? 'Actualizar meta' : 'Establecer meta') + '</button>';
+      + '<input id="goal-target-input" class="input" type="number" min="1" step="1" value="' + target + '"></div>'
+      + '<div style="display:flex;gap:10px">'
+      + '<button class="btn block" onclick="submitGoalForm(\'' + id + '\')">' + (goal ? 'Guardar cambios' : 'Añadir meta') + '</button>'
+      + '<button class="btn secondary" onclick="closeGoalForm()">Cancelar</button>'
+      + '</div>';
   }
 
-  function toggleGoalForm() {
-    document.getElementById('goalFormWrap').classList.toggle('hidden');
+  function renderMeta(data) {
+    const totalPaid = data.transactions.reduce((s, t) => s + t.amount, 0);
+    const monthlyRate = (data.members.length || 0) * (data.monthlyAmount || 0);
+    const goals = data.goals || [];
+    const el = document.getElementById('meta-content');
+
+    let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px">'
+      + '<h2 style="font-size:18px;margin:0">Metas del fondo</h2>'
+      + '<button class="btn secondary" onclick="openAddGoalForm()">+ Añadir meta</button>'
+      + '</div>';
+
+    if (goalFormMode === 'add') {
+      html += '<div class="card auth" style="max-width:440px;margin-bottom:18px">'
+        + '<h2 style="margin-bottom:4px">Nueva meta</h2><p class="sub">¿En qué quieren usar el fondo?</p>'
+        + goalFormHtml(null) + '</div>';
+    }
+
+    if (goals.length === 0 && goalFormMode !== 'add') {
+      html += '<div class="card auth" style="max-width:440px">'
+        + '<div class="goal-empty"><div class="ic">🎯</div>'
+        + '<h2 style="margin-bottom:6px">Todavía no hay metas</h2>'
+        + '<p class="sub" style="margin-bottom:0">Define en qué quieren usar el fondo — por ejemplo, un regalo para papá — y aquí verán cuánto falta y una proyección de cuándo lo lograrán.</p></div>'
+        + '</div>';
+    } else {
+      goals.forEach((g) => { html += goalCardHtml(g, totalPaid, monthlyRate); });
+    }
+
+    el.innerHTML = html;
   }
 
-  async function submitGoal() {
-    const name = document.getElementById('goal-name').value;
-    const target = document.getElementById('goal-target').value;
+  function openAddGoalForm() { goalFormMode = 'add'; renderMeta(lastData); }
+  function openEditGoalForm(id) { goalFormMode = id; renderMeta(lastData); }
+  function closeGoalForm() { goalFormMode = null; renderMeta(lastData); }
+
+  async function submitGoalForm(id) {
+    const name = document.getElementById('goal-name-input').value;
+    const target = document.getElementById('goal-target-input').value;
     const msg = document.getElementById('goalMsg');
     msg.innerHTML = '';
     try {
+      const body = { name, target };
+      if (id) body.id = id;
       const res = await fetch('/api/goal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, target }),
+        body: JSON.stringify(body),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al guardar la meta');
+      goalFormMode = null;
       await loadData();
     } catch (e) {
       msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
     }
   }
 
-  async function deleteGoal() {
+  async function deleteGoal(id) {
     if (!confirm('¿Eliminar esta meta? Los aportes ya registrados no se verán afectados.')) return;
-    const msg = document.getElementById('goalActionMsg');
     try {
-      const res = await fetch('/api/goal', { method: 'DELETE' });
+      const res = await fetch('/api/goal', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
       if (!res.ok) {
         const result = await res.json().catch(() => ({}));
         throw new Error(result.error || 'Error al eliminar la meta');
       }
+      if (goalFormMode === id) goalFormMode = null;
       await loadData();
     } catch (e) {
-      if (msg) msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
+      alert('No se pudo eliminar: ' + e.message);
     }
   }
 
@@ -524,21 +614,7 @@ button{font-family:inherit}
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
-    html += '<div class="card chart-card">'
-      + '<div class="ch-head"><h2 class="ch">Fondo acumulado en el tiempo</h2><span class="ch-val">' + fmt(totalPaid) + ' €</span></div>'
-      + '<div class="chart-wrap" id="chart-wrap"></div>'
-      + '</div>';
-
-    if (data.goal) {
-      const pct = Math.min(100, Math.round((totalPaid / data.goal.target) * 100));
-      html += '<div class="card" style="margin-bottom:18px">'
-        + '<div class="ch-head"><h2 class="ch">Meta: ' + escapeHtml(data.goal.name) + '</h2><span class="ch-val">' + pct + '%</span></div>'
-        + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
-        + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(totalPaid) + ' €</b></span><span>Meta: <b>' + fmt(data.goal.target) + ' €</b></span></div>'
-        + '</div>';
-    }
-
-    html += '<div class="card"><table class="ltable"><thead><tr><th>Nombre</th><th class="amt">Pagado</th><th class="amt">Estado</th></tr></thead><tbody>';
+    html += '<div class="card" style="margin-bottom:18px"><table class="ltable"><thead><tr><th>Nombre</th><th class="amt">Pagado</th><th class="amt">Estado</th></tr></thead><tbody>';
     rows.forEach((r) => {
       const pillHtml = r.pending === 0
         ? '<span class="pill ok">Al día</span>'
@@ -546,6 +622,11 @@ button{font-family:inherit}
       html += '<tr><td>' + nameCell(r.name) + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + pillHtml + '</td></tr>';
     });
     html += '</tbody></table></div>';
+
+    html += '<div class="card chart-card">'
+      + '<div class="ch-head"><h2 class="ch">Fondo acumulado en el tiempo</h2><span class="ch-val">' + fmt(totalPaid) + ' €</span></div>'
+      + '<div class="chart-wrap" id="chart-wrap"></div>'
+      + '</div>';
 
     document.getElementById('overview-content').innerHTML = html;
     renderFundsChart('chart-wrap', buildChartPoints(data.transactions));

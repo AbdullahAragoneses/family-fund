@@ -2,4 +2,5 @@ node_modules/
 .netlify/
 deno.lock
 verify-visual.js
+verify-goal-delete.js
 screenshots/

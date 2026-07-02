@@ -53,7 +53,7 @@ exports.handler = async (event) => {
         transactions = seedTransactions();
         await store.set('transactions', JSON.stringify(transactions));
       }
-      const goal = await store.get('goal', { type: 'json' });
+      const goals = await store.get('goals', { type: 'json' });
       return {
         statusCode: 200,
         headers,
@@ -61,7 +61,8 @@ exports.handler = async (event) => {
           transactions,
           members: MEMBERS,
           obligation: obligation(new Date()),
-          goal: goal || null,
+          monthlyAmount: MONTHLY_AMOUNT,
+          goals: goals || [],
         }),
       };
     }
