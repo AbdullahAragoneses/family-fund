@@ -69,6 +69,18 @@ button{font-family:inherit}
 .msg{font-size:14px;border-radius:12px;padding:11px 14px;margin-bottom:10px}
 .msg.err{background:var(--red-bg);color:var(--red)} .msg.ok{background:var(--green-bg);color:var(--green)}
 
+/* proof upload preview */
+#proof-preview{margin-top:10px}
+.proof-chip{display:flex;align-items:center;gap:10px;background:var(--bg2);border-radius:14px;padding:10px 12px}
+.proof-chip img{width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.proof-chip .ic{width:44px;height:44px;border-radius:8px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.proof-chip .meta{flex:1;min-width:0}
+.proof-chip .fn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proof-chip .sz{font-size:12px;color:var(--muted)}
+.proof-chip .rm{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:4px}
+.proof-chip .rm:hover{color:var(--red)}
+.proof-link{font-size:13px;font-weight:600}
+
 /* app shell */
 .app{padding:34px 0 90px;animation:fade .5s ease both}
 @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -186,7 +198,13 @@ button{font-family:inherit}
           <label>Nota (opcional)</label>
           <input type="text" id="dep-note" class="input" placeholder="ej. transferencia bancaria">
         </div>
-        <button class="btn block" id="dep-submit" onclick="submitDeposit()">Registrar aporte</button>
+        <div class="field">
+          <label>Comprobante de pago (captura o PDF) *</label>
+          <input type="file" id="dep-proof" class="input" accept="image/*,application/pdf" onchange="handleProofSelect(event)">
+          <div id="proof-preview"></div>
+        </div>
+        <button class="btn block" id="dep-submit" onclick="submitDeposit()" disabled>Registrar aporte</button>
+        <p style="font-size:12.5px;color:var(--muted);margin-top:10px">Adjunta la captura o PDF de la transferencia para poder registrar el aporte.</p>
       </div>
     </div>
   </div>
@@ -394,13 +412,17 @@ button{font-family:inherit}
       html += '<div class="card"><div class="empty"><div class="ic">📭</div>No hay aportes registrados todavía.</div></div>';
     } else {
       const sorted = [...data.transactions].sort((a, b) => (a.date < b.date ? 1 : -1));
-      html += '<div class="card scrollx"><table class="ltable"><thead><tr><th>Fecha</th><th>Nombre</th><th class="amt">Monto</th><th>Nota</th><th></th></tr></thead><tbody>';
+      html += '<div class="card scrollx"><table class="ltable"><thead><tr><th>Fecha</th><th>Nombre</th><th class="amt">Monto</th><th>Nota</th><th>Comprobante</th><th></th></tr></thead><tbody>';
       sorted.forEach((t) => {
+        const proofCell = t.proof
+          ? '<a class="proof-link" href="/api/proof?id=' + encodeURIComponent(t.id) + '" target="_blank" rel="noopener">Ver comprobante</a>'
+          : '<span style="color:var(--muted)">— (sin comprobante)</span>';
         html += '<tr>'
           + '<td>' + t.date + '</td>'
           + '<td>' + t.name + '</td>'
           + '<td class="amt">' + fmt(t.amount) + ' €</td>'
           + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
+          + '<td>' + proofCell + '</td>'
           + '<td><button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button></td>'
           + '</tr>';
       });
@@ -416,6 +438,51 @@ button{font-family:inherit}
     return div.innerHTML;
   }
 
+  let selectedProof = null; // { base64, name, type }
+  const MAX_PROOF_BYTES = 4 * 1024 * 1024; // 4MB — stays under the function's request-body limit once base64-encoded
+
+  function handleProofSelect(e) {
+    const file = e.target.files && e.target.files[0];
+    const preview = document.getElementById('proof-preview');
+    const btn = document.getElementById('dep-submit');
+    selectedProof = null;
+    btn.disabled = true;
+    preview.innerHTML = '';
+    if (!file) return;
+
+    if (file.size > MAX_PROOF_BYTES) {
+      preview.innerHTML = '<div class="msg err">El archivo pesa demasiado (máx. 4MB).</div>';
+      document.getElementById('dep-proof').value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = String(reader.result).split(',')[1] || '';
+      selectedProof = { base64, name: file.name, type: file.type };
+      btn.disabled = false;
+
+      const sizeKb = Math.round(file.size / 1024) + ' KB';
+      if (file.type.startsWith('image/')) {
+        preview.innerHTML = '<div class="proof-chip"><img src="' + reader.result + '" alt="">' +
+          '<div class="meta"><div class="fn">' + escapeHtml(file.name) + '</div><div class="sz">' + sizeKb + '</div></div>' +
+          '<button type="button" class="rm" onclick="clearProofSelection()" title="Quitar">✕</button></div>';
+      } else {
+        preview.innerHTML = '<div class="proof-chip"><div class="ic">📄</div>' +
+          '<div class="meta"><div class="fn">' + escapeHtml(file.name) + '</div><div class="sz">' + sizeKb + '</div></div>' +
+          '<button type="button" class="rm" onclick="clearProofSelection()" title="Quitar">✕</button></div>';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearProofSelection() {
+    selectedProof = null;
+    document.getElementById('dep-proof').value = '';
+    document.getElementById('proof-preview').innerHTML = '';
+    document.getElementById('dep-submit').disabled = true;
+  }
+
   async function submitDeposit() {
     const name = document.getElementById('dep-name').value;
     const amount = document.getElementById('dep-amount').value;
@@ -424,6 +491,11 @@ button{font-family:inherit}
     const btn = document.getElementById('dep-submit');
     const msg = document.getElementById('depMsg');
 
+    if (!selectedProof) {
+      msg.innerHTML = '<div class="msg err">Debes adjuntar un comprobante de pago antes de registrar el aporte.</div>';
+      return;
+    }
+
     btn.disabled = true;
     msg.innerHTML = '';
 
@@ -431,18 +503,23 @@ button{font-family:inherit}
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, amount, date, note }),
+        body: JSON.stringify({
+          name, amount, date, note,
+          proof: selectedProof.base64,
+          proofName: selectedProof.name,
+          proofType: selectedProof.type,
+        }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al registrar el aporte');
 
       msg.innerHTML = '<div class="msg ok">Aporte de ' + amount + ' € registrado para ' + name + '.</div>';
       document.getElementById('dep-note').value = '';
+      clearProofSelection();
       await loadData();
     } catch (e) {
       msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
-    } finally {
-      btn.disabled = false;
+      btn.disabled = !selectedProof;
     }
   }
 

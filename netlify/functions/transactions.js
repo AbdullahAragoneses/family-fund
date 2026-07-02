@@ -11,6 +11,16 @@ function getFundStore() {
   return getStore('family-fund');
 }
 
+function getProofStore() {
+  if (process.env.BLOBS_TOKEN) {
+    return getStore({ name: 'family-fund-proofs', siteID: SITE_ID, token: process.env.BLOBS_TOKEN });
+  }
+  return getStore('family-fund-proofs');
+}
+
+const MAX_PROOF_BYTES = 5 * 1024 * 1024; // 5MB decoded (client caps the original file at 4MB)
+const ALLOWED_PROOF_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
+
 const MEMBERS = ['Mohammed', 'Abdullah', 'Asia', 'Fausia'];
 
 // Fund started December 2025 with a €50 base contribution, then €30/month per person.
@@ -79,7 +89,7 @@ exports.handler = async (event) => {
       } catch {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) };
       }
-      const { name, amount, note, date } = body;
+      const { name, amount, note, date, proof, proofName, proofType } = body;
       if (!MEMBERS.includes(name)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Miembro desconocido' }) };
       }
@@ -87,6 +97,24 @@ exports.handler = async (event) => {
       if (!Number.isFinite(amt) || amt <= 0) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Monto inválido' }) };
       }
+      if (typeof proof !== 'string' || proof.length === 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Debes adjuntar un comprobante de pago (captura o PDF).' }) };
+      }
+      let proofBuffer;
+      try {
+        proofBuffer = Buffer.from(proof, 'base64');
+      } catch {
+        proofBuffer = Buffer.alloc(0);
+      }
+      if (proofBuffer.length === 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'El comprobante no es válido.' }) };
+      }
+      if (proofBuffer.length > MAX_PROOF_BYTES) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'El comprobante es demasiado grande (máx. 4MB).' }) };
+      }
+      const safeProofType = ALLOWED_PROOF_TYPES.includes(proofType) ? proofType : 'application/octet-stream';
+      const safeProofName = typeof proofName === 'string' && proofName.trim() ? proofName.slice(0, 120) : 'comprobante';
+
       const safeDate = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
         ? date
         : new Date().toISOString().slice(0, 10);
@@ -94,13 +122,23 @@ exports.handler = async (event) => {
       let transactions = await store.get('transactions', { type: 'json' });
       if (!transactions) transactions = seedTransactions();
 
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      const proofStore = getProofStore();
+      await proofStore.set(id, proofBuffer, {
+        metadata: { contentType: safeProofType, filename: safeProofName },
+      });
+
       transactions.push({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id,
         name,
         amount: amt,
         note: typeof note === 'string' ? note.slice(0, 200) : '',
         date: safeDate,
         submittedAt: new Date().toISOString(),
+        proof: true,
+        proofName: safeProofName,
+        proofType: safeProofType,
       });
       await store.set('transactions', JSON.stringify(transactions));
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
@@ -116,8 +154,12 @@ exports.handler = async (event) => {
       const { id } = body;
       let transactions = await store.get('transactions', { type: 'json' });
       if (!transactions) transactions = seedTransactions();
+      const target = transactions.find((t) => t.id === id);
       transactions = transactions.filter((t) => t.id !== id);
       await store.set('transactions', JSON.stringify(transactions));
+      if (target && target.proof) {
+        await getProofStore().delete(id);
+      }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }
 
