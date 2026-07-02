@@ -124,8 +124,57 @@ button{font-family:inherit}
 
 .foot{border-top:1px solid var(--line);padding:26px 24px;text-align:center;color:var(--muted);font-size:12px;background:var(--bg2);margin-top:40px}
 
+/* avatars — fixed order, one hue per member, decorative identity not data encoding */
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+  color:#fff;font-size:11px;font-weight:700;margin-right:8px;vertical-align:middle;flex-shrink:0}
+.name-cell{display:flex;align-items:center}
+
+/* chart card */
+.chart-card{margin-bottom:18px}
+.chart-card .ch-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;flex-wrap:wrap;gap:8px}
+.chart-card .ch{font-size:12px;color:var(--muted);font-weight:700;margin:0;text-transform:uppercase;letter-spacing:.05em}
+.chart-card .ch-val{font-size:15px;font-weight:700;color:var(--ink)}
+.chart-wrap{position:relative;margin-top:10px}
+.chart-wrap svg{height:220px}
+.chart-tip{position:absolute;pointer-events:none;background:#1d1d1f;color:#fff;font-size:12px;padding:6px 10px;
+  border-radius:10px;transform:translate(-50%,-115%);white-space:nowrap;opacity:0;transition:opacity .1s;z-index:5;box-shadow:var(--shadow-sm)}
+.chart-tip b{font-variant-numeric:tabular-nums}
+.chart-tip .d{color:#c7c7cc;font-size:11px;margin-top:1px}
+
+/* meter (goal progress) */
+.meter-track{background:var(--bg2);border-radius:980px;height:16px;overflow:hidden;position:relative}
+.meter-fill{height:100%;border-radius:980px;background:var(--aurora);transition:width .5s cubic-bezier(.22,1,.36,1)}
+.meter-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:14px}
+.meter-row .pct{font-weight:700;font-size:15px}
+.goal-card{position:relative;overflow:hidden}
+.goal-card .name{font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px}
+.goal-card .sub-line{color:var(--muted);font-size:14px;margin-bottom:18px}
+.goal-hit{background:linear-gradient(120deg,#faf8ff,#eef5ff);border-radius:16px;padding:14px 18px;margin-top:16px;
+  display:flex;align-items:center;gap:10px;font-weight:600;color:var(--a1)}
+.goal-numbers{display:flex;justify-content:space-between;margin-top:10px;font-size:13px;color:var(--muted)}
+.goal-numbers b{color:var(--ink);font-variant-numeric:tabular-nums}
+.goal-empty{text-align:center;padding:20px 12px}
+.goal-empty .ic{font-size:38px;margin-bottom:8px}
+
 @media(max-width:820px){.kpis{grid-template-columns:1fr 1fr}}
-@media(max-width:600px){.apphead{align-items:flex-start}.tabs{width:100%}.tab{flex:1}}
+@media(max-width:600px){
+  .apphead{align-items:flex-start}
+  .tabs{width:100%}
+  .tab{flex:1;padding:9px 8px;font-size:13px}
+  .wrap{padding:0 16px}
+  .card{padding:18px}
+  .apphead h1{font-size:23px}
+  .kpi{padding:14px}
+  .kpi .n{font-size:24px}
+  .chart-wrap svg{height:170px}
+  .ltable th,.ltable td{padding:10px 6px;font-size:13px}
+  .goal-card .name{font-size:19px}
+  .meter-row .pct{font-size:14px}
+  .avatar{width:22px;height:22px;font-size:10px;margin-right:6px}
+  .nav{padding:0 16px}
+  .brand{font-size:16px}
+  .nav-right{gap:12px;font-size:13px}
+}
 </style>
 </head>
 <body>
@@ -165,11 +214,16 @@ button{font-family:inherit}
       <div class="tabs">
         <button class="tab active" data-pane="overview">Resumen</button>
         <button class="tab" data-pane="deposit">Registrar Aporte</button>
+        <button class="tab" data-pane="meta">Meta</button>
       </div>
     </div>
 
     <div class="pane" id="pane-overview">
       <div id="overview-content"><div class="loading"><span class="spin"></span> Cargando…</div></div>
+    </div>
+
+    <div class="pane hidden" id="pane-meta">
+      <div id="meta-content"><div class="loading"><span class="spin"></span> Cargando…</div></div>
     </div>
 
     <div class="pane hidden" id="pane-deposit">
@@ -329,15 +383,85 @@ button{font-family:inherit}
     });
   });
 
+  let lastData = null;
+
   async function loadData() {
     try {
       const res = await fetch('/api/transactions');
       const data = await res.json();
+      lastData = data;
       renderOverview(data);
       renderMaster(data);
+      renderMeta(data);
     } catch (e) {
       document.getElementById('overview-content').innerHTML = '<div class="empty"><div class="ic">⚠️</div>No se pudo cargar el fondo. Intenta de nuevo.</div>';
       document.getElementById('master-content').innerHTML = '<div class="empty"><div class="ic">⚠️</div>No se pudo cargar el fondo.</div>';
+      document.getElementById('meta-content').innerHTML = '<div class="empty"><div class="ic">⚠️</div>No se pudo cargar la meta.</div>';
+    }
+  }
+
+  function renderMeta(data) {
+    const totalPaid = data.transactions.reduce((s, t) => s + t.amount, 0);
+    const el = document.getElementById('meta-content');
+    const goal = data.goal;
+
+    if (!goal) {
+      el.innerHTML = '<div class="card auth" style="max-width:440px">'
+        + '<div class="goal-empty"><div class="ic">🎯</div>'
+        + '<h2 style="margin-bottom:6px">Todavía no hay una meta</h2>'
+        + '<p class="sub" style="margin-bottom:0">Define en qué quieren usar el fondo — por ejemplo, un regalo para papá — y aquí verán cuánto falta según los aportes reales.</p></div>'
+        + goalForm(null)
+        + '</div>';
+    } else {
+      const pct = Math.min(100, (totalPaid / goal.target) * 100);
+      const remaining = Math.max(0, goal.target - totalPaid);
+      const reached = totalPaid >= goal.target;
+      el.innerHTML = '<div class="card goal-card" style="max-width:520px">'
+        + '<div class="name">' + escapeHtml(goal.name) + '</div>'
+        + '<div class="sub-line">Meta: ' + fmt(goal.target) + ' €</div>'
+        + '<div class="meter-row"><span>Progreso</span><span class="pct">' + Math.round(pct) + '%</span></div>'
+        + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
+        + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(totalPaid) + ' €</b></span><span>' + (reached ? 'Sobrante: <b>' + fmt(totalPaid - goal.target) + ' €</b>' : 'Falta: <b>' + fmt(remaining) + ' €</b>') + '</span></div>'
+        + (reached ? '<div class="goal-hit">🎉 &nbsp;¡Meta alcanzada! Ya tienen fondos suficientes.</div>' : '')
+        + '<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">'
+        + '<button class="btn secondary" onclick="toggleGoalForm()" id="editGoalBtn">Editar meta</button>'
+        + '<div id="goalFormWrap" class="hidden" style="margin-top:16px">' + goalForm(goal) + '</div>'
+        + '</div>'
+        + '</div>';
+    }
+  }
+
+  function goalForm(goal) {
+    const name = goal ? escapeHtml(goal.name).replace(/"/g, '&quot;') : '';
+    const target = goal ? goal.target : '';
+    return '<div id="goalMsg"></div>'
+      + '<div class="field"><label>Nombre de la meta</label>'
+      + '<input id="goal-name" class="input" type="text" placeholder="ej. Teléfono nuevo para papá" value="' + name + '"></div>'
+      + '<div class="field"><label>Monto objetivo (€)</label>'
+      + '<input id="goal-target" class="input" type="number" min="1" step="1" value="' + target + '"></div>'
+      + '<button class="btn block" onclick="submitGoal()">' + (goal ? 'Actualizar meta' : 'Establecer meta') + '</button>';
+  }
+
+  function toggleGoalForm() {
+    document.getElementById('goalFormWrap').classList.toggle('hidden');
+  }
+
+  async function submitGoal() {
+    const name = document.getElementById('goal-name').value;
+    const target = document.getElementById('goal-target').value;
+    const msg = document.getElementById('goalMsg');
+    msg.innerHTML = '';
+    try {
+      const res = await fetch('/api/goal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, target }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error al guardar la meta');
+      await loadData();
+    } catch (e) {
+      msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
     }
   }
 
@@ -353,6 +477,19 @@ button{font-family:inherit}
   }
 
   function fmt(n) { return n.toLocaleString('de-DE'); }
+
+  // Fixed hue per member (never cycled/reassigned) — decorative identity, not chart data.
+  const MEMBER_COLORS = { Mohammed: '#7c5cff', Abdullah: '#4f9dff', Asia: '#22d3ee', Fausia: '#c66bff' };
+
+  function avatar(name) {
+    const color = MEMBER_COLORS[name] || '#9fb4c9';
+    const initial = (name || '?').charAt(0).toUpperCase();
+    return '<span class="avatar" style="background:' + color + '">' + initial + '</span>';
+  }
+
+  function nameCell(name) {
+    return '<div class="name-cell">' + avatar(name) + '<span>' + name + '</span></div>';
+  }
 
   function renderOverview(data) {
     const rows = summarize(data);
@@ -370,20 +507,145 @@ button{font-family:inherit}
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
+    html += '<div class="card chart-card">'
+      + '<div class="ch-head"><h2 class="ch">Fondo acumulado en el tiempo</h2><span class="ch-val">' + fmt(totalPaid) + ' €</span></div>'
+      + '<div class="chart-wrap" id="chart-wrap"></div>'
+      + '</div>';
+
+    if (data.goal) {
+      const pct = Math.min(100, Math.round((totalPaid / data.goal.target) * 100));
+      html += '<div class="card" style="margin-bottom:18px">'
+        + '<div class="ch-head"><h2 class="ch">Meta: ' + escapeHtml(data.goal.name) + '</h2><span class="ch-val">' + pct + '%</span></div>'
+        + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
+        + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(totalPaid) + ' €</b></span><span>Meta: <b>' + fmt(data.goal.target) + ' €</b></span></div>'
+        + '</div>';
+    }
+
     html += '<div class="card"><table class="ltable"><thead><tr><th>Nombre</th><th class="amt">Pagado</th><th class="amt">Estado</th></tr></thead><tbody>';
     rows.forEach((r) => {
       const pillHtml = r.pending === 0
         ? '<span class="pill ok">Al día</span>'
         : '<span class="pill due">Debe ' + fmt(r.pending) + ' €</span>';
-      html += '<tr><td>' + r.name + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + pillHtml + '</td></tr>';
+      html += '<tr><td>' + nameCell(r.name) + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + pillHtml + '</td></tr>';
     });
     html += '</tbody></table></div>';
 
     document.getElementById('overview-content').innerHTML = html;
+    renderFundsChart('chart-wrap', buildChartPoints(data.transactions));
   }
 
   function kpi(n, l, cls) {
     return '<div class="kpi ' + (cls || '') + '"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>';
+  }
+
+  function buildChartPoints(transactions) {
+    const byDate = {};
+    transactions.forEach((t) => { byDate[t.date] = (byDate[t.date] || 0) + t.amount; });
+    const dates = Object.keys(byDate).sort();
+    let running = 0;
+    const points = dates.map((d) => {
+      running += byDate[d];
+      return { date: d, total: running };
+    });
+    if (points.length === 1) {
+      // Show growth from zero so a single day of history still reads as a chart.
+      points.unshift({ date: 'Inicio', total: 0 });
+    }
+    return points;
+  }
+
+  function renderFundsChart(containerId, points) {
+    const container = document.getElementById(containerId);
+    if (!container || points.length === 0) return;
+
+    const W = 700, H = 220, padL = 44, padR = 16, padT = 16, padB = 28;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+
+    const maxVal = Math.max(...points.map((p) => p.total), 1) * 1.15;
+    const useIndexScale = new Set(points.map((p) => p.date)).size < 3 || points.every((p) => p.date === points[0].date);
+
+    let xs;
+    if (useIndexScale) {
+      xs = points.map((_, i) => padL + (points.length === 1 ? plotW : (i / (points.length - 1)) * plotW));
+    } else {
+      const times = points.map((p) => (p.date === 'Inicio' ? new Date(points[1].date).getTime() - 86400000 * 3 : new Date(p.date).getTime()));
+      const minT = Math.min(...times), maxT = Math.max(...times);
+      const span = maxT - minT || 1;
+      xs = times.map((t) => padL + ((t - minT) / span) * plotW);
+    }
+    const ys = points.map((p) => padT + plotH - (p.total / maxVal) * plotH);
+
+    const linePath = xs.map((x, i) => (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + ys[i].toFixed(1)).join(' ');
+    const areaPath = linePath + ' L' + xs[xs.length - 1].toFixed(1) + ',' + (padT + plotH) + ' L' + xs[0].toFixed(1) + ',' + (padT + plotH) + ' Z';
+
+    const gridSteps = 3;
+    let gridHtml = '';
+    for (let i = 0; i <= gridSteps; i++) {
+      const gy = padT + (plotH / gridSteps) * i;
+      const val = Math.round((maxVal - (maxVal / gridSteps) * i) / 10) * 10;
+      gridHtml += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy + '" stroke="var(--line)" stroke-width="1"/>'
+        + '<text x="' + (padL - 8) + '" y="' + (gy + 4) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + fmt(val) + '</text>';
+    }
+
+    const lastX = xs[xs.length - 1], lastY = ys[ys.length - 1];
+
+    const svg = ''
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;overflow:visible" preserveAspectRatio="none" id="fundsSvg">'
+      + '<defs>'
+      + '<linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#7c5cff" stop-opacity="0.22"/>'
+      + '<stop offset="100%" stop-color="#7c5cff" stop-opacity="0"/>'
+      + '</linearGradient>'
+      + '<linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">'
+      + '<stop offset="0%" stop-color="#7c5cff"/><stop offset="38%" stop-color="#4f9dff"/>'
+      + '<stop offset="68%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#c66bff"/>'
+      + '</linearGradient>'
+      + '</defs>'
+      + gridHtml
+      + '<path d="' + areaPath + '" fill="url(#areaGrad)" stroke="none"/>'
+      + '<path d="' + linePath + '" fill="none" stroke="url(#lineGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<circle cx="' + lastX + '" cy="' + lastY + '" r="5" fill="#7c5cff" stroke="#fff" stroke-width="2"/>'
+      + '<text x="' + Math.min(lastX, W - padR - 4) + '" y="' + Math.max(lastY - 12, 12) + '" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">' + fmt(points[points.length - 1].total) + ' €</text>'
+      + '<circle id="hoverDot" cx="0" cy="0" r="5" fill="#7c5cff" stroke="#fff" stroke-width="2" style="opacity:0"/>'
+      + '<line id="hoverLine" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + plotH) + '" stroke="var(--line)" stroke-width="1" style="opacity:0"/>'
+      + '<rect x="' + padL + '" y="0" width="' + plotW + '" height="' + H + '" fill="transparent" id="hoverCatcher" style="cursor:crosshair"/>'
+      + '</svg>'
+      + '<div class="chart-tip" id="chartTip"></div>';
+
+    container.innerHTML = svg;
+
+    const svgEl = document.getElementById('fundsSvg');
+    const catcher = document.getElementById('hoverCatcher');
+    const hoverDot = document.getElementById('hoverDot');
+    const hoverLine = document.getElementById('hoverLine');
+    const tip = document.getElementById('chartTip');
+
+    catcher.addEventListener('mousemove', (evt) => {
+      const rect = svgEl.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      const mx = (evt.clientX - rect.left) * scaleX;
+      let nearest = 0, best = Infinity;
+      xs.forEach((x, i) => { const d = Math.abs(x - mx); if (d < best) { best = d; nearest = i; } });
+
+      hoverDot.setAttribute('cx', xs[nearest]);
+      hoverDot.setAttribute('cy', ys[nearest]);
+      hoverDot.style.opacity = '1';
+      hoverLine.setAttribute('x1', xs[nearest]);
+      hoverLine.setAttribute('x2', xs[nearest]);
+      hoverLine.style.opacity = '1';
+
+      const scaleY = rect.height / H;
+      tip.style.left = (xs[nearest] / scaleX) + 'px';
+      tip.style.top = (ys[nearest] * scaleY) + 'px';
+      tip.style.opacity = '1';
+      const label = points[nearest].date === 'Inicio' ? 'Inicio' : points[nearest].date;
+      tip.innerHTML = '<b>' + fmt(points[nearest].total) + ' €</b><div class="d">' + label + '</div>';
+    });
+    catcher.addEventListener('mouseleave', () => {
+      hoverDot.style.opacity = '0';
+      hoverLine.style.opacity = '0';
+      tip.style.opacity = '0';
+    });
   }
 
   function renderMaster(data) {
@@ -403,7 +665,7 @@ button{font-family:inherit}
     html += '<div class="card"><table class="ltable"><thead><tr><th>Nombre</th><th class="amt">Pagado</th><th class="amt">Pendiente</th><th class="amt">Estado</th></tr></thead><tbody>';
     rows.forEach((r) => {
       const pillHtml = r.pending === 0 ? '<span class="pill ok">Al día</span>' : '<span class="pill due">Debe</span>';
-      html += '<tr><td>' + r.name + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + (r.pending === 0 ? '—' : fmt(r.pending) + ' €') + '</td><td class="amt">' + pillHtml + '</td></tr>';
+      html += '<tr><td>' + nameCell(r.name) + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + (r.pending === 0 ? '—' : fmt(r.pending) + ' €') + '</td><td class="amt">' + pillHtml + '</td></tr>';
     });
     html += '</tbody></table></div>';
 
@@ -419,7 +681,7 @@ button{font-family:inherit}
           : '<span style="color:var(--muted)">— (sin comprobante)</span>';
         html += '<tr>'
           + '<td>' + t.date + '</td>'
-          + '<td>' + t.name + '</td>'
+          + '<td>' + nameCell(t.name) + '</td>'
           + '<td class="amt">' + fmt(t.amount) + ' €</td>'
           + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
           + '<td>' + proofCell + '</td>'

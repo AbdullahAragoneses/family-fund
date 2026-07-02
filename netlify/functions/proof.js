@@ -1,13 +1,4 @@
-const { getStore } = require('@netlify/blobs');
-
-const SITE_ID = '268bde3a-87ee-4dac-9d04-05264cd8826c';
-
-function getProofStore() {
-  if (process.env.BLOBS_TOKEN) {
-    return getStore({ name: 'family-fund-proofs', siteID: SITE_ID, token: process.env.BLOBS_TOKEN });
-  }
-  return getStore('family-fund-proofs');
-}
+const { getProofStore } = require('./lib/blobs');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {

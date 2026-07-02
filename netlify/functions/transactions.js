@@ -1,22 +1,4 @@
-const { getStore } = require('@netlify/blobs');
-
-const SITE_ID = '268bde3a-87ee-4dac-9d04-05264cd8826c';
-
-function getFundStore() {
-  // Falls back to an explicit siteID/token when the runtime doesn't auto-inject
-  // Blobs context (observed on this account: works via CLI, not via the deployed function).
-  if (process.env.BLOBS_TOKEN) {
-    return getStore({ name: 'family-fund', siteID: SITE_ID, token: process.env.BLOBS_TOKEN });
-  }
-  return getStore('family-fund');
-}
-
-function getProofStore() {
-  if (process.env.BLOBS_TOKEN) {
-    return getStore({ name: 'family-fund-proofs', siteID: SITE_ID, token: process.env.BLOBS_TOKEN });
-  }
-  return getStore('family-fund-proofs');
-}
+const { getFundStore, getProofStore } = require('./lib/blobs');
 
 const MAX_PROOF_BYTES = 5 * 1024 * 1024; // 5MB decoded (client caps the original file at 4MB)
 const ALLOWED_PROOF_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
@@ -71,6 +53,7 @@ exports.handler = async (event) => {
         transactions = seedTransactions();
         await store.set('transactions', JSON.stringify(transactions));
       }
+      const goal = await store.get('goal', { type: 'json' });
       return {
         statusCode: 200,
         headers,
@@ -78,6 +61,7 @@ exports.handler = async (event) => {
           transactions,
           members: MEMBERS,
           obligation: obligation(new Date()),
+          goal: goal || null,
         }),
       };
     }
