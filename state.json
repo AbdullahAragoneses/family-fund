@@ -20,11 +20,10 @@
     },
     {
       "name": "Asia",
-      "paid": 140,
-      "pending": 150,
+      "paid": 170,
+      "pending": 120,
       "pendingMonths": [
-        "marzo",
-        "abril",
+        "diciembre",
         "mayo",
         "junio",
         "julio"
