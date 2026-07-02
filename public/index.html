@@ -423,10 +423,12 @@ button{font-family:inherit}
         + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
         + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(totalPaid) + ' €</b></span><span>' + (reached ? 'Sobrante: <b>' + fmt(totalPaid - goal.target) + ' €</b>' : 'Falta: <b>' + fmt(remaining) + ' €</b>') + '</span></div>'
         + (reached ? '<div class="goal-hit">🎉 &nbsp;¡Meta alcanzada! Ya tienen fondos suficientes.</div>' : '')
-        + '<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">'
+        + '<div id="goalActionMsg"></div>'
+        + '<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px;display:flex;gap:10px;flex-wrap:wrap">'
         + '<button class="btn secondary" onclick="toggleGoalForm()" id="editGoalBtn">Editar meta</button>'
-        + '<div id="goalFormWrap" class="hidden" style="margin-top:16px">' + goalForm(goal) + '</div>'
+        + '<button class="btn secondary" style="color:var(--red)" onclick="deleteGoal()">Eliminar meta</button>'
         + '</div>'
+        + '<div id="goalFormWrap" class="hidden" style="margin-top:16px">' + goalForm(goal) + '</div>'
         + '</div>';
     }
   }
@@ -462,6 +464,21 @@ button{font-family:inherit}
       await loadData();
     } catch (e) {
       msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
+    }
+  }
+
+  async function deleteGoal() {
+    if (!confirm('¿Eliminar esta meta? Los aportes ya registrados no se verán afectados.')) return;
+    const msg = document.getElementById('goalActionMsg');
+    try {
+      const res = await fetch('/api/goal', { method: 'DELETE' });
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}));
+        throw new Error(result.error || 'Error al eliminar la meta');
+      }
+      await loadData();
+    } catch (e) {
+      if (msg) msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
     }
   }
 
