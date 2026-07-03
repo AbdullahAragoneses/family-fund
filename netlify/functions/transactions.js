@@ -137,6 +137,9 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) };
       }
       const { id } = body;
+      if (typeof id === 'string' && id.startsWith('seed-')) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'El saldo inicial no se puede eliminar.' }) };
+      }
       let transactions = await store.get('transactions', { type: 'json' });
       if (!transactions) transactions = seedTransactions();
       const target = transactions.find((t) => t.id === id);

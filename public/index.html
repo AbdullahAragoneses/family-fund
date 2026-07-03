@@ -840,15 +840,19 @@ button{font-family:inherit}
     }
     let html = '<table class="ltable"><thead><tr><th>Fecha</th><th class="amt">Monto</th><th>Nota</th><th>Comprobante</th><th></th></tr></thead><tbody>';
     list.forEach((t) => {
+      const isSeed = t.id.startsWith('seed-');
       const proofCell = t.proof
         ? '<a class="proof-link" href="/api/proof?id=' + encodeURIComponent(t.id) + '" target="_blank" rel="noopener">Ver comprobante</a>'
         : '<span style="color:var(--muted)">— (sin comprobante)</span>';
+      const actionCell = isSeed
+        ? '<span class="pill" style="background:var(--bg2);color:var(--muted)" title="Saldo inicial — no se puede eliminar">🔒</span>'
+        : '<button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button>';
       html += '<tr>'
         + '<td>' + t.date + '</td>'
         + '<td class="amt">' + fmt(t.amount) + ' €</td>'
         + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
         + '<td>' + proofCell + '</td>'
-        + '<td><button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button></td>'
+        + '<td>' + actionCell + '</td>'
         + '</tr>';
     });
     html += '</tbody></table>';
