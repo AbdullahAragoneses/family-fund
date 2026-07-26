@@ -74,28 +74,42 @@ exports.handler = async (event) => {
       } catch {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) };
       }
-      const { name, amount, note, date, proof, proofName, proofType } = body;
-      if (!MEMBERS.includes(name)) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Miembro desconocido' }) };
-      }
+      const { name, amount, note, date, proof, proofName, proofType, type, reason } = body;
+      const isWithdrawal = type === 'withdrawal';
+
       const amt = Number(amount);
       if (!Number.isFinite(amt) || amt <= 0) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Monto inválido' }) };
       }
-      if (typeof proof !== 'string' || proof.length === 0) {
+
+      if (!isWithdrawal && !MEMBERS.includes(name)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Miembro desconocido' }) };
+      }
+
+      const safeReason = typeof reason === 'string' ? reason.trim().slice(0, 200) : '';
+      if (isWithdrawal && !safeReason) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Indica el motivo del retiro.' }) };
+      }
+
+      // Deposits must have a proof attached; withdrawals may optionally include a receipt.
+      const hasProof = typeof proof === 'string' && proof.length > 0;
+      if (!isWithdrawal && !hasProof) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Debes adjuntar un comprobante de pago (captura o PDF).' }) };
       }
-      let proofBuffer;
-      try {
-        proofBuffer = Buffer.from(proof, 'base64');
-      } catch {
-        proofBuffer = Buffer.alloc(0);
-      }
-      if (proofBuffer.length === 0) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'El comprobante no es válido.' }) };
-      }
-      if (proofBuffer.length > MAX_PROOF_BYTES) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'El comprobante es demasiado grande (máx. 4MB).' }) };
+
+      let proofBuffer = Buffer.alloc(0);
+      if (hasProof) {
+        try {
+          proofBuffer = Buffer.from(proof, 'base64');
+        } catch {
+          proofBuffer = Buffer.alloc(0);
+        }
+        if (proofBuffer.length === 0) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: 'El comprobante no es válido.' }) };
+        }
+        if (proofBuffer.length > MAX_PROOF_BYTES) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: 'El comprobante es demasiado grande (máx. 4MB).' }) };
+        }
       }
       const safeProofType = ALLOWED_PROOF_TYPES.includes(proofType) ? proofType : 'application/octet-stream';
       const safeProofName = typeof proofName === 'string' && proofName.trim() ? proofName.slice(0, 120) : 'comprobante';
@@ -107,24 +121,42 @@ exports.handler = async (event) => {
       let transactions = await store.get('transactions', { type: 'json' });
       if (!transactions) transactions = seedTransactions();
 
+      if (isWithdrawal) {
+        const balance = transactions.reduce((s, t) => s + (t.type === 'withdrawal' ? -t.amount : t.amount), 0);
+        if (amt > balance) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: `No puedes retirar más del saldo disponible (${balance} €).` }) };
+        }
+      }
+
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      const proofStore = getProofStore();
-      await proofStore.set(id, proofBuffer, {
-        metadata: { contentType: safeProofType, filename: safeProofName },
-      });
+      if (hasProof) {
+        const proofStore = getProofStore();
+        await proofStore.set(id, proofBuffer, {
+          metadata: { contentType: safeProofType, filename: safeProofName },
+        });
+      }
 
-      transactions.push({
+      const transaction = {
         id,
-        name,
+        type: isWithdrawal ? 'withdrawal' : 'deposit',
         amount: amt,
         note: typeof note === 'string' ? note.slice(0, 200) : '',
         date: safeDate,
         submittedAt: new Date().toISOString(),
-        proof: true,
-        proofName: safeProofName,
-        proofType: safeProofType,
-      });
+      };
+      if (isWithdrawal) {
+        transaction.reason = safeReason;
+      } else {
+        transaction.name = name;
+      }
+      if (hasProof) {
+        transaction.proof = true;
+        transaction.proofName = safeProofName;
+        transaction.proofType = safeProofType;
+      }
+
+      transactions.push(transaction);
       await store.set('transactions', JSON.stringify(transactions));
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }

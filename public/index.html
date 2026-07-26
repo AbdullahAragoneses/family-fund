@@ -470,10 +470,10 @@ button{font-family:inherit}
     return { monthsToGo, dateLabel: MONTHS_ES[target.getMonth()] + ' ' + target.getFullYear() };
   }
 
-  function goalCardHtml(goal, totalPaid, monthlyRate) {
-    const pct = Math.min(100, (totalPaid / goal.target) * 100);
-    const remaining = Math.max(0, goal.target - totalPaid);
-    const reached = totalPaid >= goal.target;
+  function goalCardHtml(goal, available, monthlyRate) {
+    const pct = Math.min(100, (available / goal.target) * 100);
+    const remaining = Math.max(0, goal.target - available);
+    const reached = available >= goal.target;
     let extraLine = '';
     if (reached) {
       extraLine = '<div class="goal-hit">🎉 &nbsp;¡Meta alcanzada! Ya tienen fondos suficientes.</div>';
@@ -489,7 +489,7 @@ button{font-family:inherit}
       + '<div class="sub-line">Meta: ' + fmt(goal.target) + ' €</div>'
       + '<div class="meter-row"><span>Progreso</span><span class="pct">' + Math.round(pct) + '%</span></div>'
       + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
-      + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(totalPaid) + ' €</b></span><span>' + (reached ? 'Sobrante: <b>' + fmt(totalPaid - goal.target) + ' €</b>' : 'Falta: <b>' + fmt(remaining) + ' €</b>') + '</span></div>'
+      + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(available) + ' €</b></span><span>' + (reached ? 'Sobrante: <b>' + fmt(available - goal.target) + ' €</b>' : 'Falta: <b>' + fmt(remaining) + ' €</b>') + '</span></div>'
       + extraLine
       + '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px;display:flex;gap:10px;flex-wrap:wrap">'
       + '<button class="btn secondary" onclick="openEditGoalForm(\'' + goal.id + '\')">Editar</button>'
@@ -515,7 +515,7 @@ button{font-family:inherit}
   }
 
   function renderMeta(data) {
-    const totalPaid = data.transactions.reduce((s, t) => s + t.amount, 0);
+    const available = computeBalance(data).balance;
     const monthlyRate = (data.members.length || 0) * (data.monthlyAmount || 0);
     const goals = data.goals || [];
     const el = document.getElementById('meta-content');
@@ -538,7 +538,7 @@ button{font-family:inherit}
         + '<p class="sub" style="margin-bottom:0">Define en qué quieren usar el fondo — por ejemplo, un regalo para papá — y aquí verán cuánto falta y una proyección de cuándo lo lograrán.</p></div>'
         + '</div>';
     } else {
-      goals.forEach((g) => { html += goalCardHtml(g, totalPaid, monthlyRate); });
+      goals.forEach((g) => { html += goalCardHtml(g, available, monthlyRate); });
     }
 
     el.innerHTML = html;
@@ -592,12 +592,25 @@ button{font-family:inherit}
   function summarize(data) {
     const byName = {};
     data.members.forEach((m) => (byName[m] = 0));
-    data.transactions.forEach((t) => (byName[t.name] = (byName[t.name] || 0) + t.amount));
+    data.transactions.forEach((t) => {
+      if (t.type === 'withdrawal') return; // withdrawals aren't tied to a member's personal dues
+      byName[t.name] = (byName[t.name] || 0) + t.amount;
+    });
     return data.members.map((m) => {
       const paid = byName[m] || 0;
       const pending = Math.max(0, data.obligation - paid);
       return { name: m, paid, pending };
     });
+  }
+
+  // Real cash on hand: everything deposited, minus everything withdrawn for expenses.
+  function computeBalance(data) {
+    let deposits = 0, withdrawals = 0;
+    data.transactions.forEach((t) => {
+      if (t.type === 'withdrawal') withdrawals += t.amount;
+      else deposits += t.amount;
+    });
+    return { deposits, withdrawals, balance: deposits - withdrawals };
   }
 
   function fmt(n) { return n.toLocaleString('de-DE'); }
@@ -620,6 +633,7 @@ button{font-family:inherit}
     const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
     const totalPending = rows.reduce((s, r) => s + r.pending, 0);
     const upToDate = rows.filter((r) => r.pending === 0).length;
+    const bal = computeBalance(data);
 
     document.getElementById('headerMeta').textContent =
       'Aportación mensual: 30 € por persona · obligación acumulada: ' + fmt(data.obligation) + ' € por persona';
@@ -627,7 +641,7 @@ button{font-family:inherit}
     let html = '<div class="kpis">'
       + kpi(fmt(totalPaid) + ' €', 'Total recaudado', '')
       + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
-      + kpi(fmt(totalPaid + totalPending) + ' €', 'Total una vez al día', '')
+      + kpi(fmt(bal.balance) + ' €', 'Saldo disponible', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
@@ -641,7 +655,7 @@ button{font-family:inherit}
     html += '</tbody></table></div>';
 
     html += '<div class="card chart-card">'
-      + '<div class="ch-head"><h2 class="ch">Fondo acumulado en el tiempo</h2><span class="ch-val">' + fmt(totalPaid) + ' €</span></div>'
+      + '<div class="ch-head"><h2 class="ch">Fondo acumulado en el tiempo</h2><span class="ch-val">' + fmt(bal.balance) + ' €</span></div>'
       + '<div class="chart-wrap" id="chart-wrap"></div>'
       + '</div>';
 
@@ -655,7 +669,10 @@ button{font-family:inherit}
 
   function buildChartPoints(transactions) {
     const byDate = {};
-    transactions.forEach((t) => { byDate[t.date] = (byDate[t.date] || 0) + t.amount; });
+    transactions.forEach((t) => {
+      const delta = t.type === 'withdrawal' ? -t.amount : t.amount;
+      byDate[t.date] = (byDate[t.date] || 0) + delta;
+    });
     const dates = Object.keys(byDate).sort();
     let running = 0;
     const points = dates.map((d) => {
@@ -768,11 +785,14 @@ button{font-family:inherit}
     const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
     const totalPending = rows.reduce((s, r) => s + r.pending, 0);
     const upToDate = rows.filter((r) => r.pending === 0).length;
+    const bal = computeBalance(data);
+    const deposits = data.transactions.filter((t) => t.type !== 'withdrawal');
+    const withdrawals = data.transactions.filter((t) => t.type === 'withdrawal');
 
     let html = '<div class="kpis">'
       + kpi(fmt(totalPaid) + ' €', 'Total recaudado', '')
+      + kpi(fmt(bal.balance) + ' €', 'Saldo disponible', '')
       + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
-      + kpi(data.transactions.length, 'Aportes registrados', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
@@ -784,10 +804,26 @@ button{font-family:inherit}
     });
     html += '</tbody></table></div>';
 
-    html += '<div class="section-title">Historial de aportes por persona (' + data.transactions.length + ' en total)</div>';
+    html += '<div class="section-title">Historial de aportes por persona (' + deposits.length + ' en total)</div>';
     html += renderMemberAccordion(data);
 
+    html += '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'
+      + '<span>Historial de retiros (' + withdrawals.length + ' en total)</span>'
+      + (withdrawFormOpen ? '' : '<button class="btn secondary" onclick="openWithdrawForm()">+ Registrar retiro</button>')
+      + '</div>';
+    if (withdrawFormOpen) {
+      html += '<div class="card auth" style="max-width:440px;margin-bottom:18px">'
+        + '<h2 style="margin-bottom:4px">Nuevo retiro</h2><p class="sub">Registra dinero que salió del fondo — el saldo disponible actual es ' + fmt(bal.balance) + ' €.</p>'
+        + withdrawFormHtml() + '</div>';
+    }
+    html += renderWithdrawalsTable(withdrawals);
+
     document.getElementById('master-content').innerHTML = html;
+
+    if (withdrawFormOpen) {
+      const wdDate = document.getElementById('wd-date');
+      if (wdDate && !wdDate.value) wdDate.valueAsDate = new Date();
+    }
 
     // Fix up the already-open panel's height precisely now that it's in the DOM (no transition on initial render).
     if (openMemberName) {
@@ -798,15 +834,128 @@ button{font-family:inherit}
   }
 
   let openMemberName = null;
+  let withdrawFormOpen = false;
+  let selectedWithdrawProof = null;
+
+  function withdrawFormHtml() {
+    return '<div id="wdMsg"></div>'
+      + '<div class="field"><label>Motivo del retiro</label>'
+      + '<input id="wd-reason" class="input" type="text" placeholder="ej. Teléfono nuevo para papá"></div>'
+      + '<div class="field"><label>Monto (€)</label>'
+      + '<input type="number" id="wd-amount" class="input" min="1" step="1"></div>'
+      + '<div class="field"><label>Fecha</label>'
+      + '<input type="date" id="wd-date" class="input"></div>'
+      + '<div class="field"><label>Nota (opcional)</label>'
+      + '<input type="text" id="wd-note" class="input" placeholder="ej. comprado en la tienda X"></div>'
+      + '<div class="field"><label>Comprobante (opcional)</label>'
+      + '<input type="file" id="wd-proof" class="input" accept="image/*,application/pdf" onchange="handleWithdrawProofSelect(event)">'
+      + '<div id="wd-proof-preview"></div></div>'
+      + '<div style="display:flex;gap:10px">'
+      + '<button class="btn block" onclick="submitWithdrawal()">Registrar retiro</button>'
+      + '<button class="btn secondary" onclick="closeWithdrawForm()">Cancelar</button>'
+      + '</div>';
+  }
+
+  function renderWithdrawalsTable(list) {
+    if (list.length === 0) {
+      return '<div class="card"><div class="empty"><div class="ic">🏦</div>Todavía no se ha retirado dinero del fondo.</div></div>';
+    }
+    const sorted = list.slice().sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return (a.submittedAt || '') < (b.submittedAt || '') ? 1 : -1;
+    });
+    let html = '<div class="card scrollx"><table class="ltable"><thead><tr><th>Fecha</th><th>Motivo</th><th class="amt">Monto</th><th>Nota</th><th>Comprobante</th><th></th></tr></thead><tbody>';
+    sorted.forEach((t) => {
+      const proofCell = t.proof
+        ? '<a class="proof-link" href="/api/proof?id=' + encodeURIComponent(t.id) + '" target="_blank" rel="noopener">Ver comprobante</a>'
+        : '<span style="color:var(--muted)">—</span>';
+      html += '<tr>'
+        + '<td>' + t.date + '</td>'
+        + '<td style="white-space:normal">' + escapeHtml(t.reason || '') + '</td>'
+        + '<td class="amt" style="color:var(--red)">−' + fmt(t.amount) + ' €</td>'
+        + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
+        + '<td>' + proofCell + '</td>'
+        + '<td><button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function openWithdrawForm() {
+    withdrawFormOpen = true;
+    selectedWithdrawProof = null;
+    renderMaster(lastData);
+  }
+
+  function closeWithdrawForm() {
+    withdrawFormOpen = false;
+    selectedWithdrawProof = null;
+    renderMaster(lastData);
+  }
+
+  async function submitWithdrawal() {
+    const reason = document.getElementById('wd-reason').value;
+    const amount = document.getElementById('wd-amount').value;
+    const date = document.getElementById('wd-date').value;
+    const note = document.getElementById('wd-note').value;
+    const msg = document.getElementById('wdMsg');
+    msg.innerHTML = '';
+    try {
+      const body = { type: 'withdrawal', reason, amount, date, note };
+      if (selectedWithdrawProof) {
+        body.proof = selectedWithdrawProof.base64;
+        body.proofName = selectedWithdrawProof.name;
+        body.proofType = selectedWithdrawProof.type;
+      }
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error al registrar el retiro');
+      withdrawFormOpen = false;
+      selectedWithdrawProof = null;
+      await loadData();
+    } catch (e) {
+      msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
+    }
+  }
+
+  function handleWithdrawProofSelect(e) {
+    const file = e.target.files && e.target.files[0];
+    const preview = document.getElementById('wd-proof-preview');
+    selectedWithdrawProof = null;
+    preview.innerHTML = '';
+    if (!file) return;
+
+    readProofFile(file)
+      .then((result) => {
+        selectedWithdrawProof = result;
+        preview.innerHTML = proofChipHtml(result, file.size, 'clearWithdrawProofSelection()');
+      })
+      .catch((err) => {
+        preview.innerHTML = '<div class="msg err">' + err.message + '</div>';
+        document.getElementById('wd-proof').value = '';
+      });
+  }
+
+  function clearWithdrawProofSelection() {
+    selectedWithdrawProof = null;
+    document.getElementById('wd-proof').value = '';
+    document.getElementById('wd-proof-preview').innerHTML = '';
+  }
 
   function renderMemberAccordion(data) {
-    if (data.transactions.length === 0) {
+    const deposits = data.transactions.filter((t) => t.type !== 'withdrawal');
+    if (deposits.length === 0) {
       return '<div class="card"><div class="empty"><div class="ic">📭</div>No hay aportes registrados todavía.</div></div>';
     }
 
     const byMember = {};
     data.members.forEach((m) => { byMember[m] = []; });
-    data.transactions.forEach((t) => { (byMember[t.name] || (byMember[t.name] = [])).push(t); });
+    deposits.forEach((t) => { (byMember[t.name] || (byMember[t.name] = [])).push(t); });
 
     let html = '<div class="member-accordion">';
     data.members.forEach((m) => {
@@ -898,6 +1047,33 @@ button{font-family:inherit}
   let selectedProof = null; // { base64, name, type }
   const MAX_PROOF_BYTES = 4 * 1024 * 1024; // 4MB — stays under the function's request-body limit once base64-encoded
 
+  // Shared by the deposit and withdrawal forms: reads a file into base64 + a data URL for preview.
+  function readProofFile(file) {
+    return new Promise((resolve, reject) => {
+      if (file.size > MAX_PROOF_BYTES) {
+        reject(new Error('El archivo pesa demasiado (máx. 4MB).'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = String(reader.result).split(',')[1] || '';
+        resolve({ base64, name: file.name, type: file.type, dataUrl: reader.result });
+      };
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function proofChipHtml(result, sizeBytes, onRemoveCall) {
+    const sizeKb = Math.round(sizeBytes / 1024) + ' KB';
+    const thumb = result.type.startsWith('image/')
+      ? '<img src="' + result.dataUrl + '" alt="">'
+      : '<div class="ic">📄</div>';
+    return '<div class="proof-chip">' + thumb
+      + '<div class="meta"><div class="fn">' + escapeHtml(result.name) + '</div><div class="sz">' + sizeKb + '</div></div>'
+      + '<button type="button" class="rm" onclick="' + onRemoveCall + '" title="Quitar">✕</button></div>';
+  }
+
   function handleProofSelect(e) {
     const file = e.target.files && e.target.files[0];
     const preview = document.getElementById('proof-preview');
@@ -907,30 +1083,16 @@ button{font-family:inherit}
     preview.innerHTML = '';
     if (!file) return;
 
-    if (file.size > MAX_PROOF_BYTES) {
-      preview.innerHTML = '<div class="msg err">El archivo pesa demasiado (máx. 4MB).</div>';
-      document.getElementById('dep-proof').value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = String(reader.result).split(',')[1] || '';
-      selectedProof = { base64, name: file.name, type: file.type };
-      btn.disabled = false;
-
-      const sizeKb = Math.round(file.size / 1024) + ' KB';
-      if (file.type.startsWith('image/')) {
-        preview.innerHTML = '<div class="proof-chip"><img src="' + reader.result + '" alt="">' +
-          '<div class="meta"><div class="fn">' + escapeHtml(file.name) + '</div><div class="sz">' + sizeKb + '</div></div>' +
-          '<button type="button" class="rm" onclick="clearProofSelection()" title="Quitar">✕</button></div>';
-      } else {
-        preview.innerHTML = '<div class="proof-chip"><div class="ic">📄</div>' +
-          '<div class="meta"><div class="fn">' + escapeHtml(file.name) + '</div><div class="sz">' + sizeKb + '</div></div>' +
-          '<button type="button" class="rm" onclick="clearProofSelection()" title="Quitar">✕</button></div>';
-      }
-    };
-    reader.readAsDataURL(file);
+    readProofFile(file)
+      .then((result) => {
+        selectedProof = result;
+        btn.disabled = false;
+        preview.innerHTML = proofChipHtml(result, file.size, 'clearProofSelection()');
+      })
+      .catch((err) => {
+        preview.innerHTML = '<div class="msg err">' + err.message + '</div>';
+        document.getElementById('dep-proof').value = '';
+      });
   }
 
   function clearProofSelection() {

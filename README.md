@@ -14,9 +14,9 @@ admin view to audit the full history.
 
 ## How it works
 
-- **Overview**: paid-to-date and pending per person, computed live from the transaction log.
+- **Overview**: paid-to-date and pending per person, plus the fund's actual available balance, computed live from the transaction log.
 - **Registrar Aporte**: any sibling picks their name, enters an amount/date/note, and submits — visible to everyone immediately.
-- **Panel Admin**: full transaction history with delete (for correcting mistakes), plus the same per-person paid/pending breakdown for oversight.
+- **Panel Admin**: full transaction history with delete (for correcting mistakes), the per-person paid/pending breakdown for oversight, and a **Registrar retiro** form for logging money spent out of the pooled fund (e.g. a family purchase) — withdrawals reduce the available balance and the fund chart, but don't count against any individual's personal dues, and can't exceed what's actually in the fund.
 - The monthly obligation (€50 base + €30/month since December 2025) is calculated automatically each time the page loads — no more manual monthly script or cron job.
 
 ## Local development
