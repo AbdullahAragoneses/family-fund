@@ -645,9 +645,9 @@ button{font-family:inherit}
       'Aportación mensual: 30 € por persona · obligación acumulada: ' + fmt(data.obligation) + ' € por persona';
 
     let html = '<div class="kpis">'
-      + kpi(fmt(totalPaid) + ' €', 'Total recaudado', '')
+      + kpi(fmt(bal.balance) + ' €', 'Total recaudado', '')
       + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
-      + kpi(fmt(bal.balance) + ' €', 'Saldo disponible', '')
+      + kpi(fmt(totalPaid + totalPending) + ' €', 'Total una vez al día', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
@@ -796,9 +796,9 @@ button{font-family:inherit}
     const withdrawals = data.transactions.filter((t) => t.type === 'withdrawal');
 
     let html = '<div class="kpis">'
-      + kpi(fmt(totalPaid) + ' €', 'Total recaudado', '')
-      + kpi(fmt(bal.balance) + ' €', 'Saldo disponible', '')
+      + kpi(fmt(bal.balance) + ' €', 'Total recaudado', '')
       + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
+      + kpi(fmt(totalPaid + totalPending) + ' €', 'Total una vez al día', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
