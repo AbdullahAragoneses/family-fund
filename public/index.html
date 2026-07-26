@@ -274,6 +274,7 @@ button{font-family:inherit}
       <div class="tabs">
         <button class="tab active" data-pane="overview">Resumen</button>
         <button class="tab" data-pane="deposit">Registrar Aporte</button>
+        <button class="tab" data-pane="retiro">Retiro</button>
         <button class="tab" data-pane="meta">Meta</button>
       </div>
     </div>
@@ -319,6 +320,36 @@ button{font-family:inherit}
         </div>
         <button class="btn block" id="dep-submit" onclick="submitDeposit()" disabled>Registrar aporte</button>
         <p style="font-size:12.5px;color:var(--muted);margin-top:10px">Adjunta la captura o PDF de la transferencia para poder registrar el aporte.</p>
+      </div>
+    </div>
+
+    <div class="pane hidden" id="pane-retiro">
+      <div class="card auth" style="max-width:420px">
+        <h2>Registrar retiro</h2>
+        <p class="sub">Registra dinero que salió del fondo para un gasto — se descuenta del total, no de ninguna persona en particular.</p>
+        <div id="wdMsg"></div>
+        <div class="field">
+          <label>Motivo del retiro</label>
+          <input id="wd-reason" class="input" type="text" placeholder="ej. Teléfono nuevo para papá">
+        </div>
+        <div class="field">
+          <label>Monto (€)</label>
+          <input type="number" id="wd-amount" class="input" min="1" step="1">
+        </div>
+        <div class="field">
+          <label>Fecha</label>
+          <input type="date" id="wd-date" class="input">
+        </div>
+        <div class="field">
+          <label>Nota (opcional)</label>
+          <input type="text" id="wd-note" class="input" placeholder="ej. comprado en la tienda X">
+        </div>
+        <div class="field">
+          <label>Comprobante (opcional)</label>
+          <input type="file" id="wd-proof" class="input" accept="image/*,application/pdf" onchange="handleWithdrawProofSelect(event)">
+          <div id="wd-proof-preview"></div>
+        </div>
+        <button class="btn block" onclick="submitWithdrawal()">Registrar retiro</button>
       </div>
     </div>
   </div>
@@ -393,6 +424,7 @@ button{font-family:inherit}
   function enterApp() {
     show('viewApp');
     document.getElementById('dep-date').valueAsDate = new Date();
+    document.getElementById('wd-date').valueAsDate = new Date();
     loadData();
   }
 
@@ -813,23 +845,10 @@ button{font-family:inherit}
     html += '<div class="section-title">Historial de aportes por persona (' + deposits.length + ' en total)</div>';
     html += renderMemberAccordion(data);
 
-    html += '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'
-      + '<span>Historial de retiros (' + withdrawals.length + ' en total)</span>'
-      + (withdrawFormOpen ? '' : '<button class="btn secondary" onclick="openWithdrawForm()">+ Registrar retiro</button>')
-      + '</div>';
-    if (withdrawFormOpen) {
-      html += '<div class="card auth" style="max-width:440px;margin-bottom:18px">'
-        + '<h2 style="margin-bottom:4px">Nuevo retiro</h2><p class="sub">Registra dinero que salió del fondo — el saldo disponible actual es ' + fmt(bal.balance) + ' €.</p>'
-        + withdrawFormHtml() + '</div>';
-    }
+    html += '<div class="section-title">Historial de retiros (' + withdrawals.length + ' en total)</div>';
     html += renderWithdrawalsTable(withdrawals);
 
     document.getElementById('master-content').innerHTML = html;
-
-    if (withdrawFormOpen) {
-      const wdDate = document.getElementById('wd-date');
-      if (wdDate && !wdDate.value) wdDate.valueAsDate = new Date();
-    }
 
     // Fix up the already-open panel's height precisely now that it's in the DOM (no transition on initial render).
     if (openMemberName) {
@@ -840,27 +859,7 @@ button{font-family:inherit}
   }
 
   let openMemberName = null;
-  let withdrawFormOpen = false;
   let selectedWithdrawProof = null;
-
-  function withdrawFormHtml() {
-    return '<div id="wdMsg"></div>'
-      + '<div class="field"><label>Motivo del retiro</label>'
-      + '<input id="wd-reason" class="input" type="text" placeholder="ej. Teléfono nuevo para papá"></div>'
-      + '<div class="field"><label>Monto (€)</label>'
-      + '<input type="number" id="wd-amount" class="input" min="1" step="1"></div>'
-      + '<div class="field"><label>Fecha</label>'
-      + '<input type="date" id="wd-date" class="input"></div>'
-      + '<div class="field"><label>Nota (opcional)</label>'
-      + '<input type="text" id="wd-note" class="input" placeholder="ej. comprado en la tienda X"></div>'
-      + '<div class="field"><label>Comprobante (opcional)</label>'
-      + '<input type="file" id="wd-proof" class="input" accept="image/*,application/pdf" onchange="handleWithdrawProofSelect(event)">'
-      + '<div id="wd-proof-preview"></div></div>'
-      + '<div style="display:flex;gap:10px">'
-      + '<button class="btn block" onclick="submitWithdrawal()">Registrar retiro</button>'
-      + '<button class="btn secondary" onclick="closeWithdrawForm()">Cancelar</button>'
-      + '</div>';
-  }
 
   function renderWithdrawalsTable(list) {
     if (list.length === 0) {
@@ -888,18 +887,6 @@ button{font-family:inherit}
     return html;
   }
 
-  function openWithdrawForm() {
-    withdrawFormOpen = true;
-    selectedWithdrawProof = null;
-    renderMaster(lastData);
-  }
-
-  function closeWithdrawForm() {
-    withdrawFormOpen = false;
-    selectedWithdrawProof = null;
-    renderMaster(lastData);
-  }
-
   async function submitWithdrawal() {
     const reason = document.getElementById('wd-reason').value;
     const amount = document.getElementById('wd-amount').value;
@@ -921,8 +908,12 @@ button{font-family:inherit}
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al registrar el retiro');
-      withdrawFormOpen = false;
-      selectedWithdrawProof = null;
+
+      msg.innerHTML = '<div class="msg ok">Retiro de ' + amount + ' € registrado (' + reason + ').</div>';
+      document.getElementById('wd-reason').value = '';
+      document.getElementById('wd-amount').value = '';
+      document.getElementById('wd-note').value = '';
+      clearWithdrawProofSelection();
       await loadData();
     } catch (e) {
       msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
