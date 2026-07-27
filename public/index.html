@@ -44,6 +44,13 @@ button{font-family:inherit}
 .nav-right{display:flex;align-items:center;gap:18px;font-size:14px;color:var(--muted)}
 .nav-right a,.nav-right button{color:var(--ink);background:none;border:0;cursor:pointer;font-size:14px}
 .nav-right a:hover{color:var(--a2)}
+.nav-hamburger{display:none;background:none;border:0;font-size:22px;line-height:1;cursor:pointer;color:var(--ink);padding:6px 4px}
+
+/* mobile nav menu (sheet) — collapses the main app's nav-right on narrow screens */
+.nav-menu-list{display:flex;flex-direction:column;gap:8px}
+.nav-menu-item{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:14px;border:0;
+  background:var(--bg2);font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;font-family:inherit}
+.nav-menu-item:hover{background:#ececef}
 
 .wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
 .center{min-height:calc(100vh - 54px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px 24px}
@@ -219,6 +226,8 @@ button{font-family:inherit}
   .nav{padding:0 16px}
   .brand{font-size:16px}
   .nav-right{gap:12px;font-size:13px}
+  #appNavRight{display:none}
+  #appNavHamburger{display:inline-flex;align-items:center;justify-content:center}
 }
 </style>
 </head>
@@ -244,7 +253,8 @@ button{font-family:inherit}
 <section id="viewApp" class="hidden">
   <nav class="nav">
     <div class="brand"><span class="dot"></span> Fondo Familiar</div>
-    <div class="nav-right">
+    <button id="appNavHamburger" class="nav-hamburger" aria-label="Menú">☰</button>
+    <div class="nav-right" id="appNavRight">
       <a href="#" id="navHelp">Instrucciones</a>
       <a href="#" id="navNotif">🔔 Notificaciones</a>
       <a href="#" id="navMaster">Administración</a>
@@ -289,6 +299,19 @@ button{font-family:inherit}
       </div>
       <button class="btn block" id="notif-enable-btn" onclick="enableNotifications()">Activar y probar notificaciones</button>
       <button class="btn secondary block" style="margin-top:10px" onclick="document.getElementById('notifModal').classList.add('hidden')">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- mobile-only nav menu — collapses Instrucciones/Notificaciones/Administración/Salir behind a hamburger on narrow screens -->
+  <div id="navMenuModal" class="modal hidden">
+    <div class="sheet">
+      <h2>Menú</h2>
+      <div class="nav-menu-list">
+        <button class="nav-menu-item" onclick="navMenuForward('navHelp')">📘 Instrucciones</button>
+        <button class="nav-menu-item" onclick="navMenuForward('navNotif')">🔔 Notificaciones</button>
+        <button class="nav-menu-item" onclick="navMenuForward('navMaster')">🔐 Administración</button>
+        <button class="nav-menu-item" style="color:var(--red)" onclick="navMenuForward('navSignout')">Salir</button>
+      </div>
     </div>
   </div>
 
@@ -464,6 +487,15 @@ button{font-family:inherit}
     localStorage.removeItem(AUTH_KEY);
     location.reload();
   });
+
+  document.getElementById('appNavHamburger').addEventListener('click', () => {
+    document.getElementById('navMenuModal').classList.remove('hidden');
+  });
+
+  function navMenuForward(id) {
+    document.getElementById('navMenuModal').classList.add('hidden');
+    document.getElementById(id).click();
+  }
 
   document.getElementById('navHelp').addEventListener('click', (e) => {
     e.preventDefault();
