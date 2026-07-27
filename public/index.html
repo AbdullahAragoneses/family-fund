@@ -668,7 +668,6 @@ button{font-family:inherit}
 
   function renderOverview(data) {
     const rows = summarize(data);
-    const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
     const totalPending = rows.reduce((s, r) => s + r.pending, 0);
     const upToDate = rows.filter((r) => r.pending === 0).length;
     const bal = computeBalance(data);
@@ -679,7 +678,7 @@ button{font-family:inherit}
     let html = '<div class="kpis">'
       + kpi(fmt(bal.balance) + ' €', 'Total recaudado', '')
       + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
-      + kpi(fmt(totalPaid + totalPending) + ' €', 'Total una vez al día', '')
+      + kpi(fmt(bal.balance + totalPending) + ' €', 'Total una vez al día', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
@@ -820,7 +819,6 @@ button{font-family:inherit}
 
   function renderMaster(data) {
     const rows = summarize(data);
-    const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
     const totalPending = rows.reduce((s, r) => s + r.pending, 0);
     const upToDate = rows.filter((r) => r.pending === 0).length;
     const bal = computeBalance(data);
@@ -830,7 +828,7 @@ button{font-family:inherit}
     let html = '<div class="kpis">'
       + kpi(fmt(bal.balance) + ' €', 'Total recaudado', '')
       + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
-      + kpi(fmt(totalPaid + totalPending) + ' €', 'Total una vez al día', '')
+      + kpi(fmt(bal.balance + totalPending) + ' €', 'Total una vez al día', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
