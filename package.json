@@ -4,6 +4,10 @@
   "private": true,
   "description": "Fondo Familiar — interactive tracker with per-sibling deposit entry",
   "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+    "@netlify/blobs": "^8.1.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
   }
 }

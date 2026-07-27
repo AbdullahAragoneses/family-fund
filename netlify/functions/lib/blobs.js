@@ -18,4 +18,11 @@ function getProofStore() {
   return getStore('family-fund-proofs');
 }
 
-module.exports = { getFundStore, getProofStore, SITE_ID };
+function getSubscriptionsStore() {
+  if (process.env.BLOBS_TOKEN) {
+    return getStore({ name: 'family-fund-push-subscriptions', siteID: SITE_ID, token: process.env.BLOBS_TOKEN });
+  }
+  return getStore('family-fund-push-subscriptions');
+}
+
+module.exports = { getFundStore, getProofStore, getSubscriptionsStore, SITE_ID };

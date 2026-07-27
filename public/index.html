@@ -246,6 +246,7 @@ button{font-family:inherit}
     <div class="brand"><span class="dot"></span> Fondo Familiar</div>
     <div class="nav-right">
       <a href="#" id="navHelp">Instrucciones</a>
+      <a href="#" id="navNotif">🔔 Notificaciones</a>
       <a href="#" id="navMaster">Administración</a>
       <button id="navSignout">Salir</button>
     </div>
@@ -269,6 +270,25 @@ button{font-family:inherit}
       </ul>
       <p class="sub" style="margin-bottom:16px">En «Resumen» pueden ver el total del fondo y quién está al día.</p>
       <button class="btn block" onclick="document.getElementById('helpModal').classList.add('hidden')">Entendido</button>
+    </div>
+  </div>
+
+  <div id="notifModal" class="modal hidden">
+    <div class="sheet">
+      <h2>Notificaciones</h2>
+      <p class="sub">Actívalas para recibir un recordatorio si te falta pagar tu aporte del mes.</p>
+      <div id="notifMsg"></div>
+      <div class="field">
+        <label>¿Quién eres?</label>
+        <select id="notif-name" class="input">
+          <option value="Mohammed">Mohammed</option>
+          <option value="Abdullah">Abdullah</option>
+          <option value="Asia">Asia</option>
+          <option value="Fausia">Fausia</option>
+        </select>
+      </div>
+      <button class="btn block" id="notif-enable-btn" onclick="enableNotifications()">Activar y probar notificaciones</button>
+      <button class="btn secondary block" style="margin-top:10px" onclick="document.getElementById('notifModal').classList.add('hidden')">Cerrar</button>
     </div>
   </div>
 
@@ -405,6 +425,11 @@ button{font-family:inherit}
   const MASTER_AUTH_KEY = 'familyFundMasterAuth_v1';
   const PWD = '1234';
   const MASTER_PWD = '786';
+  const VAPID_PUBLIC_KEY = 'BN7yE70j2F00LScOnwhAEZam-mE3UH9B4yzrxnc8-vC5vXlVAZvILzCyTVlXR8lrN2htVvPU5FolkvoFhBaO1eE';
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
 
   function show(id) {
     ['viewGate', 'viewApp', 'viewMasterGate', 'viewMaster'].forEach((v) => {
@@ -444,6 +469,61 @@ button{font-family:inherit}
     e.preventDefault();
     document.getElementById('helpModal').classList.remove('hidden');
   });
+
+  document.getElementById('navNotif').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('notifModal').classList.remove('hidden');
+  });
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  async function enableNotifications() {
+    const name = document.getElementById('notif-name').value;
+    const msg = document.getElementById('notifMsg');
+    const btn = document.getElementById('notif-enable-btn');
+    msg.innerHTML = '';
+    btn.disabled = true;
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('Este navegador no soporta notificaciones push (en iPhone, primero agrega la app a tu pantalla de inicio).');
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        throw new Error('Permiso de notificaciones denegado.');
+      }
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, subscription: sub.toJSON(), sendTest: true }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error al activar notificaciones');
+      if (result.testSent) {
+        msg.innerHTML = '<div class="msg ok">¡Notificaciones activadas! Deberías recibir una de prueba en unos segundos.</div>';
+      } else {
+        msg.innerHTML = '<div class="msg err">Se guardó la suscripción, pero la notificación de prueba falló: ' + (result.testError || 'error desconocido') + '</div>';
+      }
+    } catch (e) {
+      msg.innerHTML = '<div class="msg err">' + e.message + '</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
 
   document.getElementById('navMaster').addEventListener('click', (e) => {
     e.preventDefault();
