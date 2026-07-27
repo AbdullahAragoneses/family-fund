@@ -90,6 +90,13 @@ button{font-family:inherit}
 /* app shell */
 .app{padding:34px 0 90px;animation:fade .5s ease both}
 @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* goal-reached confetti */
+.confetti-piece{position:absolute;top:-20px;opacity:.95;border-radius:2px;animation:confetti-fall linear forwards}
+@keyframes confetti-fall{
+  0%{transform:translate(0,0) rotate(0deg);opacity:1}
+  100%{transform:translate(var(--drift),105vh) rotate(var(--rot));opacity:0}
+}
 .apphead{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:26px}
 .apphead h1{font-size:28px;letter-spacing:-.02em;margin:0}
 .apphead .lead{margin:6px 0 0;color:var(--muted)}
@@ -580,6 +587,40 @@ button{font-family:inherit}
     }
 
     el.innerHTML = html;
+
+    const newlyReached = goals.filter((g) => available >= g.target && !celebratedGoals.has(g.id));
+    if (newlyReached.length > 0) {
+      newlyReached.forEach((g) => celebratedGoals.add(g.id));
+      celebrateGoal();
+    }
+  }
+
+  const celebratedGoals = new Set();
+
+  function celebrateGoal() {
+    const colors = ['#7c5cff', '#4f9dff', '#22d3ee', '#c66bff', '#ff7ac6'];
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden';
+    document.body.appendChild(container);
+
+    const count = 90;
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement('div');
+      const color = colors[i % colors.length];
+      const size = 6 + (i % 5) * 2;
+      const startX = Math.random() * 100;
+      const duration = (2.2 + Math.random() * 1.4).toFixed(2);
+      const delay = (Math.random() * 0.3).toFixed(2);
+      const rotation = Math.round(360 + Math.random() * 360);
+      const drift = Math.round((Math.random() - 0.5) * 200);
+      piece.className = 'confetti-piece';
+      piece.style.cssText = 'left:' + startX + 'vw;width:' + size + 'px;height:' + (size * 0.4) + 'px;'
+        + 'background:' + color + ';animation-duration:' + duration + 's;animation-delay:' + delay + 's;'
+        + '--drift:' + drift + 'px;--rot:' + rotation + 'deg';
+      container.appendChild(piece);
+    }
+
+    setTimeout(() => container.remove(), 4200);
   }
 
   function openAddGoalForm() { goalFormMode = 'add'; renderMeta(lastData); }
@@ -676,9 +717,9 @@ button{font-family:inherit}
       'Aportación mensual: 30 € por persona · obligación acumulada: ' + fmt(data.obligation) + ' € por persona';
 
     let html = '<div class="kpis">'
-      + kpi(fmt(bal.balance) + ' €', 'Total recaudado', '')
-      + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
-      + kpi(fmt(bal.balance + totalPending) + ' €', 'Total una vez al día', '')
+      + kpiAnimated(bal.balance, ' €', 'Total recaudado', '')
+      + kpiAnimated(totalPending, ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
+      + kpiAnimated(bal.balance + totalPending, ' €', 'Total una vez al día', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
@@ -697,11 +738,40 @@ button{font-family:inherit}
       + '</div>';
 
     document.getElementById('overview-content').innerHTML = html;
+    runPendingKpiAnimations();
     renderFundsChart('chart-wrap', buildChartPoints(data.transactions));
   }
 
   function kpi(n, l, cls) {
     return '<div class="kpi ' + (cls || '') + '"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>';
+  }
+
+  // Monetary KPIs count up from 0 once inserted into the DOM, instead of just appearing.
+  let pendingKpiAnimations = [];
+  let kpiAnimCounter = 0;
+
+  function kpiAnimated(target, suffix, l, cls) {
+    const id = 'kpi-anim-' + (kpiAnimCounter++);
+    pendingKpiAnimations.push({ id, target, suffix });
+    return '<div class="kpi ' + (cls || '') + '"><div class="n" id="' + id + '">0' + suffix + '</div><div class="l">' + l + '</div></div>';
+  }
+
+  function runPendingKpiAnimations() {
+    const animations = pendingKpiAnimations;
+    pendingKpiAnimations = [];
+    const duration = 700;
+    animations.forEach(({ id, target, suffix }) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const start = performance.now();
+      function tick(now) {
+        const progress = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = fmt(Math.round(target * eased)) + suffix;
+        if (progress < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
   }
 
   function buildChartPoints(transactions) {
@@ -826,9 +896,9 @@ button{font-family:inherit}
     const withdrawals = data.transactions.filter((t) => t.type === 'withdrawal');
 
     let html = '<div class="kpis">'
-      + kpi(fmt(bal.balance) + ' €', 'Total recaudado', '')
-      + kpi(fmt(totalPending) + ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
-      + kpi(fmt(bal.balance + totalPending) + ' €', 'Total una vez al día', '')
+      + kpiAnimated(bal.balance, ' €', 'Total recaudado', '')
+      + kpiAnimated(totalPending, ' €', 'Total pendiente', totalPending > 0 ? 'bad' : 'good')
+      + kpiAnimated(bal.balance + totalPending, ' €', 'Total una vez al día', '')
       + kpi(upToDate + ' / ' + data.members.length, 'Miembros al día', upToDate === data.members.length ? 'good' : '')
       + '</div>';
 
@@ -847,6 +917,7 @@ button{font-family:inherit}
     html += renderWithdrawalsTable(withdrawals);
 
     document.getElementById('master-content').innerHTML = html;
+    runPendingKpiAnimations();
 
     // Fix up the already-open panel's height precisely now that it's in the DOM (no transition on initial render).
     if (openMemberName) {
