@@ -20,6 +20,7 @@ admin view to audit the full history.
 - **Panel Admin**: full transaction history — deposits and withdrawals — with delete (for correcting mistakes), plus the per-person paid/pending breakdown for oversight.
 - **🔔 Notificaciones**: each sibling can opt in to push notifications on their own device (`public/sw.js` + `netlify/functions/subscribe.js`, subscriptions stored in a separate Netlify Blobs store). Currently a manual "enable + send me a test" flow — a scheduled monthly reminder for whoever's still pending is the next step, not yet wired up. Requires the app to be added to the Home Screen on iOS (Safari's Web Push restriction).
 - The monthly obligation (€50 base + €30/month since December 2025) is calculated automatically each time the page loads — no more manual monthly script or cron job.
+- **Mobile UX**: installable as a home-screen PWA with a custom icon (`public/manifest.json`, `public/icons/`); all three nav bars collapse behind a ☰ button on narrow screens, opening a shared right-edge slide-out drawer (`#navDrawer` / `openNavDrawer()`) instead of the old centered popup; KPI numbers count up on load and reaching a goal triggers a confetti burst.
 
 ## Local development
 
