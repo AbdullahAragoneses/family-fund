@@ -46,11 +46,25 @@ button{font-family:inherit}
 .nav-right a:hover{color:var(--a2)}
 .nav-hamburger{display:none;background:none;border:0;font-size:22px;line-height:1;cursor:pointer;color:var(--ink);padding:6px 4px}
 
-/* mobile nav menu (sheet) — collapses the main app's nav-right on narrow screens */
-.nav-menu-list{display:flex;flex-direction:column;gap:8px}
-.nav-menu-item{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:14px;border:0;
+/* mobile nav drawer — shared by all three nav bars, slides in from the right edge */
+.nav-drawer{position:fixed;inset:0;z-index:300;visibility:hidden;pointer-events:none;
+  transition:visibility 0s linear .35s}
+.nav-drawer.open{visibility:visible;pointer-events:auto;transition-delay:0s}
+.nav-drawer-backdrop{position:absolute;inset:0;background:rgba(20,20,30,.4);backdrop-filter:blur(5px);
+  -webkit-backdrop-filter:blur(5px);opacity:0;transition:opacity .35s ease}
+.nav-drawer.open .nav-drawer-backdrop{opacity:1}
+.nav-drawer-panel{position:absolute;top:0;right:0;bottom:0;width:min(78vw,300px);background:#fff;
+  box-shadow:var(--shadow);border-radius:var(--radius) 0 0 var(--radius);padding:20px 16px;
+  display:flex;flex-direction:column;overflow-y:auto;
+  transform:translateX(100%);transition:transform .35s cubic-bezier(.22,1,.36,1)}
+.nav-drawer.open .nav-drawer-panel{transform:translateX(0)}
+.nav-drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.nav-drawer-head h2{font-size:17px;margin:0}
+.nav-drawer-close{background:none;border:0;font-size:18px;line-height:1;cursor:pointer;color:var(--muted);padding:6px}
+.nav-drawer-list{display:flex;flex-direction:column;gap:8px}
+.nav-drawer-item{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:14px;border:0;
   background:var(--bg2);font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;font-family:inherit}
-.nav-menu-item:hover{background:#ececef}
+.nav-drawer-item:hover{background:#ececef}
 
 .wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
 .center{min-height:calc(100vh - 54px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px 24px}
@@ -228,6 +242,10 @@ button{font-family:inherit}
   .nav-right{gap:12px;font-size:13px}
   #appNavRight{display:none}
   #appNavHamburger{display:inline-flex;align-items:center;justify-content:center}
+  #masterGateNavRight{display:none}
+  #masterGateNavHamburger{display:inline-flex;align-items:center;justify-content:center}
+  #masterNavRight{display:none}
+  #masterNavHamburger{display:inline-flex;align-items:center;justify-content:center}
 }
 </style>
 </head>
@@ -299,19 +317,6 @@ button{font-family:inherit}
       </div>
       <button class="btn block" id="notif-enable-btn" onclick="enableNotifications()">Activar y probar notificaciones</button>
       <button class="btn secondary block" style="margin-top:10px" onclick="document.getElementById('notifModal').classList.add('hidden')">Cerrar</button>
-    </div>
-  </div>
-
-  <!-- mobile-only nav menu — collapses Instrucciones/Notificaciones/Administración/Salir behind a hamburger on narrow screens -->
-  <div id="navMenuModal" class="modal hidden">
-    <div class="sheet">
-      <h2>Menú</h2>
-      <div class="nav-menu-list">
-        <button class="nav-menu-item" onclick="navMenuForward('navHelp')">📘 Instrucciones</button>
-        <button class="nav-menu-item" onclick="navMenuForward('navNotif')">🔔 Notificaciones</button>
-        <button class="nav-menu-item" onclick="navMenuForward('navMaster')">🔐 Administración</button>
-        <button class="nav-menu-item" style="color:var(--red)" onclick="navMenuForward('navSignout')">Salir</button>
-      </div>
     </div>
   </div>
 
@@ -411,7 +416,8 @@ button{font-family:inherit}
 <section id="viewMasterGate" class="hidden">
   <nav class="nav">
     <div class="brand"><span class="dot"></span> Fondo Familiar · Administración</div>
-    <div class="nav-right"><a href="#" id="masterBack">← App</a></div>
+    <button id="masterGateNavHamburger" class="nav-hamburger" aria-label="Menú">☰</button>
+    <div class="nav-right" id="masterGateNavRight"><a href="#" id="masterBack">← App</a></div>
   </nav>
   <div class="center">
     <div class="card auth">
@@ -431,7 +437,8 @@ button{font-family:inherit}
 <section id="viewMaster" class="hidden">
   <nav class="nav">
     <div class="brand"><span class="dot"></span> Fondo Familiar · Administración</div>
-    <div class="nav-right">
+    <button id="masterNavHamburger" class="nav-hamburger" aria-label="Menú">☰</button>
+    <div class="nav-right" id="masterNavRight">
       <a href="#" id="masterBack2">← App</a>
       <button id="masterSignout">Salir del panel</button>
     </div>
@@ -442,6 +449,18 @@ button{font-family:inherit}
     <div id="master-content"><div class="loading"><span class="spin"></span> Cargando…</div></div>
   </div>
 </section>
+
+<!-- shared mobile nav drawer — used by all three nav bars via openNavDrawer() -->
+<div id="navDrawer" class="nav-drawer">
+  <div class="nav-drawer-backdrop" onclick="closeNavDrawer()"></div>
+  <div class="nav-drawer-panel">
+    <div class="nav-drawer-head">
+      <h2>Menú</h2>
+      <button class="nav-drawer-close" aria-label="Cerrar" onclick="closeNavDrawer()">✕</button>
+    </div>
+    <div id="navDrawerList" class="nav-drawer-list"></div>
+  </div>
+</div>
 
 <script>
   const AUTH_KEY = 'familyFundAuth_v3';
@@ -488,14 +507,35 @@ button{font-family:inherit}
     location.reload();
   });
 
-  document.getElementById('appNavHamburger').addEventListener('click', () => {
-    document.getElementById('navMenuModal').classList.remove('hidden');
-  });
+  function openNavDrawer(items) {
+    document.getElementById('navDrawerList').innerHTML = items.map((item) => {
+      const style = item.danger ? ' style="color:var(--red)"' : '';
+      return '<button class="nav-drawer-item"' + style + ' onclick="navDrawerForward(\'' + item.targetId + '\')">' +
+        (item.emoji ? item.emoji + ' ' : '') + item.label + '</button>';
+    }).join('');
+    document.getElementById('navDrawer').classList.add('open');
+  }
 
-  function navMenuForward(id) {
-    document.getElementById('navMenuModal').classList.add('hidden');
+  function closeNavDrawer() {
+    document.getElementById('navDrawer').classList.remove('open');
+  }
+
+  function navDrawerForward(id) {
+    closeNavDrawer();
     document.getElementById(id).click();
   }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeNavDrawer();
+  });
+
+  const NAV_DRAWER_ITEMS_APP = [
+    { emoji: '📘', label: 'Instrucciones', targetId: 'navHelp' },
+    { emoji: '🔔', label: 'Notificaciones', targetId: 'navNotif' },
+    { emoji: '🔐', label: 'Administración', targetId: 'navMaster' },
+    { label: 'Salir', targetId: 'navSignout', danger: true },
+  ];
+  document.getElementById('appNavHamburger').addEventListener('click', () => openNavDrawer(NAV_DRAWER_ITEMS_APP));
 
   document.getElementById('navHelp').addEventListener('click', (e) => {
     e.preventDefault();
@@ -571,6 +611,17 @@ button{font-family:inherit}
     localStorage.removeItem(MASTER_AUTH_KEY);
     show('viewApp');
   });
+
+  const NAV_DRAWER_ITEMS_MASTER_GATE = [
+    { emoji: '←', label: 'App', targetId: 'masterBack' },
+  ];
+  document.getElementById('masterGateNavHamburger').addEventListener('click', () => openNavDrawer(NAV_DRAWER_ITEMS_MASTER_GATE));
+
+  const NAV_DRAWER_ITEMS_MASTER = [
+    { emoji: '←', label: 'App', targetId: 'masterBack2' },
+    { label: 'Salir del panel', targetId: 'masterSignout', danger: true },
+  ];
+  document.getElementById('masterNavHamburger').addEventListener('click', () => openNavDrawer(NAV_DRAWER_ITEMS_MASTER));
 
   function checkMasterPassword() {
     const val = document.getElementById('master-pwd-input').value;
