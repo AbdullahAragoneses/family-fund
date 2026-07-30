@@ -4,6 +4,9 @@ const MAX_PROOF_BYTES = 5 * 1024 * 1024; // 5MB decoded (client caps the origina
 const ALLOWED_PROOF_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
 
 const MEMBERS = ['Mohammed', 'Abdullah', 'Asia', 'Fausia'];
+// Deposits can also be logged as "General" — not tied to any one person's dues,
+// for money going back into the fund itself (e.g. a repayment).
+const GENERAL_NAME = 'General';
 
 // Fund started December 2025 with a €50 base contribution, then €30/month per person.
 const START_YEAR = 2025;
@@ -82,7 +85,7 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Monto inválido' }) };
       }
 
-      if (!isWithdrawal && !MEMBERS.includes(name)) {
+      if (!isWithdrawal && name !== GENERAL_NAME && !MEMBERS.includes(name)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Miembro desconocido' }) };
       }
 

@@ -345,7 +345,7 @@ button{font-family:inherit}
     <div class="pane hidden" id="pane-deposit">
       <div class="card auth" style="max-width:420px">
         <h2>Registrar aporte</h2>
-        <p class="sub">Elige tu nombre y registra lo que depositaste.</p>
+        <p class="sub">Elige tu nombre, o "General" si el aporte no corresponde a la cuota de una persona en concreto (por ejemplo, una reposición al fondo).</p>
         <div id="depMsg"></div>
         <div class="field">
           <label>Miembro</label>
@@ -354,6 +354,7 @@ button{font-family:inherit}
             <option value="Abdullah">Abdullah</option>
             <option value="Asia">Asia</option>
             <option value="Fausia">Fausia</option>
+            <option value="General">General (no atribuido a nadie)</option>
           </select>
         </div>
         <div class="field">
@@ -859,6 +860,8 @@ button{font-family:inherit}
 
   // Fixed hue per member (never cycled/reassigned) — decorative identity, not chart data.
   const MEMBER_COLORS = { Mohammed: '#7c5cff', Abdullah: '#4f9dff', Asia: '#22d3ee', Fausia: '#c66bff' };
+  // Deposits logged as "General" aren't tied to any one member's dues — see submitDeposit().
+  const GENERAL_NAME = 'General';
 
   function avatar(name) {
     const color = MEMBER_COLORS[name] || '#9fb4c9';
@@ -1057,6 +1060,7 @@ button{font-family:inherit}
     const bal = computeBalance(data);
     const deposits = data.transactions.filter((t) => t.type !== 'withdrawal');
     const withdrawals = data.transactions.filter((t) => t.type === 'withdrawal');
+    const generalDeposits = deposits.filter((t) => t.name === GENERAL_NAME);
 
     let html = '<div class="kpis">'
       + kpiAnimated(bal.balance, ' €', 'Total recaudado', '')
@@ -1073,8 +1077,11 @@ button{font-family:inherit}
     });
     html += '</tbody></table></div>';
 
-    html += '<div class="section-title">Historial de aportes por persona (' + deposits.length + ' en total)</div>';
+    html += '<div class="section-title">Historial de aportes por persona (' + (deposits.length - generalDeposits.length) + ' en total)</div>';
     html += renderMemberAccordion(data);
+
+    html += '<div class="section-title">Historial de aportes generales (' + generalDeposits.length + ' en total)</div>';
+    html += renderGeneralDepositsTable(generalDeposits);
 
     html += '<div class="section-title">Historial de retiros (' + withdrawals.length + ' en total)</div>';
     html += renderWithdrawalsTable(withdrawals);
@@ -1113,6 +1120,35 @@ button{font-family:inherit}
         + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
         + '<td>' + proofCell + '</td>'
         + '<td><button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function renderGeneralDepositsTable(list) {
+    if (list.length === 0) {
+      return '<div class="card"><div class="empty"><div class="ic">🤝</div>Todavía no hay aportes generales registrados.</div></div>';
+    }
+    const sorted = list.slice().sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return (a.submittedAt || '') < (b.submittedAt || '') ? 1 : -1;
+    });
+    let html = '<div class="card scrollx"><table class="ltable"><thead><tr><th>Fecha</th><th class="amt">Monto</th><th>Nota</th><th>Comprobante</th><th></th></tr></thead><tbody>';
+    sorted.forEach((t) => {
+      const isSeed = t.id.startsWith('seed-');
+      const proofCell = t.proof
+        ? '<a class="proof-link" href="/api/proof?id=' + encodeURIComponent(t.id) + '" target="_blank" rel="noopener">Ver comprobante</a>'
+        : '<span style="color:var(--muted)">— (sin comprobante)</span>';
+      const actionCell = isSeed
+        ? '<span class="pill" style="background:var(--bg2);color:var(--muted)" title="Saldo inicial — no se puede eliminar">🔒</span>'
+        : '<button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button>';
+      html += '<tr>'
+        + '<td>' + t.date + '</td>'
+        + '<td class="amt">+' + fmt(t.amount) + ' €</td>'
+        + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
+        + '<td>' + proofCell + '</td>'
+        + '<td>' + actionCell + '</td>'
         + '</tr>';
     });
     html += '</tbody></table></div>';
