@@ -128,6 +128,12 @@ button{font-family:inherit}
 .tab.active{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
 .pane{animation:fade .4s ease both}
 
+/* privacy: hide amounts (eye toggle in the header, or shake the phone) */
+.amounts-toggle{background:none;border:0;cursor:pointer;font-size:18px;line-height:1;padding:4px 8px;
+  color:var(--muted);border-radius:980px;transition:.15s;vertical-align:middle;margin-left:2px}
+.amounts-toggle:hover{background:var(--bg2);color:var(--ink)}
+body.amounts-hidden .money{filter:blur(7px);user-select:none;-webkit-user-select:none}
+
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
@@ -323,7 +329,8 @@ button{font-family:inherit}
   <div class="wrap app">
     <div class="apphead">
       <div>
-        <h1>Resumen del fondo</h1>
+        <h1>Resumen del fondo<button id="amountsToggleBtn" class="amounts-toggle" type="button"
+          title="Ocultar montos" aria-label="Ocultar montos" onclick="toggleAmountsVisibility()">👁️</button></h1>
         <p class="lead" id="headerMeta"></p>
       </div>
       <div class="tabs">
@@ -410,7 +417,7 @@ button{font-family:inherit}
     </div>
   </div>
 
-  <div class="foot">Fondo familiar · 30 €/persona al mes · 4 miembros</div>
+  <div class="foot">Fondo familiar · <span class="money">30 €/persona al mes</span> · 4 miembros</div>
 </section>
 
 <!-- ░░ MASTER GATE (Abdullah only) ░░ -->
@@ -469,6 +476,81 @@ button{font-family:inherit}
   const PWD = '1234';
   const MASTER_PWD = '786';
   const VAPID_PUBLIC_KEY = 'BN7yE70j2F00LScOnwhAEZam-mE3UH9B4yzrxnc8-vC5vXlVAZvILzCyTVlXR8lrN2htVvPU5FolkvoFhBaO1eE';
+
+  // ── Privacy: hide amounts (eye button, or shake the phone) ──
+  // Per-device preference (like AUTH_KEY above) — there's no per-person login in
+  // this app, so this can't be "per user", only "per device".
+  const HIDE_AMOUNTS_KEY = 'familyFundHideAmounts_v1';
+  let amountsHidden = localStorage.getItem(HIDE_AMOUNTS_KEY) === 'yes';
+
+  function applyAmountsVisibility() {
+    document.body.classList.toggle('amounts-hidden', amountsHidden);
+    const btn = document.getElementById('amountsToggleBtn');
+    if (btn) {
+      btn.textContent = amountsHidden ? '🙈' : '👁️';
+      const label = amountsHidden ? 'Mostrar montos' : 'Ocultar montos';
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+    }
+  }
+  applyAmountsVisibility();
+
+  function toggleAmountsVisibility() {
+    amountsHidden = !amountsHidden;
+    localStorage.setItem(HIDE_AMOUNTS_KEY, amountsHidden ? 'yes' : 'no');
+    applyAmountsVisibility();
+    // First tap = a real user gesture, which is exactly when iOS Safari allows
+    // requesting motion-sensor access — piggyback the shake permission ask here
+    // instead of a separate dedicated prompt.
+    ensureShakePermission();
+  }
+
+  // Shake-to-hide: a firm shake always hides amounts (never un-hides) — the
+  // same one-way "panic hide" gesture Revolut and other banking apps use.
+  // Showing them again always requires a deliberate tap on the eye button.
+  let lastMotion = null;
+  let lastShakeAt = 0;
+  const SHAKE_DELTA_THRESHOLD = 18; // combined |Δx|+|Δy|+|Δz| in m/s² between two motion samples
+  const SHAKE_COOLDOWN_MS = 1200;
+
+  function handleDeviceMotion(event) {
+    const acc = event.accelerationIncludingGravity;
+    if (!acc || acc.x === null) return;
+    if (lastMotion) {
+      const delta = Math.abs(acc.x - lastMotion.x) + Math.abs(acc.y - lastMotion.y) + Math.abs(acc.z - lastMotion.z);
+      const now = Date.now();
+      if (delta > SHAKE_DELTA_THRESHOLD && now - lastShakeAt > SHAKE_COOLDOWN_MS) {
+        lastShakeAt = now;
+        if (!amountsHidden) {
+          amountsHidden = true;
+          localStorage.setItem(HIDE_AMOUNTS_KEY, 'yes');
+          applyAmountsVisibility();
+        }
+      }
+    }
+    lastMotion = { x: acc.x, y: acc.y, z: acc.z };
+  }
+
+  let shakePermissionRequested = false;
+  async function ensureShakePermission() {
+    if (shakePermissionRequested) return;
+    shakePermissionRequested = true;
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      // iOS 13+: motion access needs an explicit request tied to a user gesture.
+      try {
+        const state = await DeviceMotionEvent.requestPermission();
+        if (state === 'granted') window.addEventListener('devicemotion', handleDeviceMotion);
+      } catch {
+        // Not supported or denied — shake simply won't work on this device.
+      }
+    }
+  }
+
+  // Android/desktop browsers don't gate devicemotion behind a permission prompt —
+  // safe to attach immediately. iOS is handled lazily via ensureShakePermission().
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function' && window.DeviceMotionEvent) {
+    window.addEventListener('devicemotion', handleDeviceMotion);
+  }
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -689,16 +771,16 @@ button{font-family:inherit}
     } else {
       const proj = projectGoal(remaining, monthlyRate);
       extraLine = proj
-        ? '<div class="goal-projection">📈 Al ritmo actual de aportes (' + fmt(monthlyRate) + ' €/mes), faltarían aprox. '
+        ? '<div class="goal-projection">📈 Al ritmo actual de aportes (<span class="money">' + fmt(monthlyRate) + ' €/mes</span>), faltarían aprox. '
           + proj.monthsToGo + (proj.monthsToGo === 1 ? ' mes' : ' meses') + ' — hacia ' + proj.dateLabel + '.</div>'
         : '';
     }
     return '<div class="card goal-card" style="max-width:520px;margin-bottom:18px">'
       + '<div class="name">' + escapeHtml(goal.name) + '</div>'
-      + '<div class="sub-line">Meta: ' + fmt(goal.target) + ' €</div>'
+      + '<div class="sub-line">Meta: <span class="money">' + fmt(goal.target) + ' €</span></div>'
       + '<div class="meter-row"><span>Progreso</span><span class="pct">' + Math.round(pct) + '%</span></div>'
       + '<div class="meter-track"><div class="meter-fill" style="width:' + pct + '%"></div></div>'
-      + '<div class="goal-numbers"><span>Ahorrado: <b>' + fmt(available) + ' €</b></span><span>' + (reached ? 'Sobrante: <b>' + fmt(available - goal.target) + ' €</b>' : 'Falta: <b>' + fmt(remaining) + ' €</b>') + '</span></div>'
+      + '<div class="goal-numbers"><span>Ahorrado: <b class="money">' + fmt(available) + ' €</b></span><span>' + (reached ? 'Sobrante: <b class="money">' + fmt(available - goal.target) + ' €</b>' : 'Falta: <b class="money">' + fmt(remaining) + ' €</b>') + '</span></div>'
       + extraLine
       + '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px;display:flex;gap:10px;flex-wrap:wrap">'
       + '<button class="btn secondary" onclick="openEditGoalForm(\'' + goal.id + '\')">Editar</button>'
@@ -879,8 +961,9 @@ button{font-family:inherit}
     const upToDate = rows.filter((r) => r.pending === 0).length;
     const bal = computeBalance(data);
 
-    document.getElementById('headerMeta').textContent =
-      'Aportación mensual: 30 € por persona · obligación acumulada: ' + fmt(data.obligation) + ' € por persona';
+    document.getElementById('headerMeta').innerHTML =
+      'Aportación mensual: <span class="money">30 €</span> por persona · obligación acumulada: '
+      + '<span class="money">' + fmt(data.obligation) + ' €</span> por persona';
 
     let html = '<div class="kpis">'
       + kpiAnimated(bal.balance, ' €', 'Total recaudado', '')
@@ -893,13 +976,13 @@ button{font-family:inherit}
     rows.forEach((r) => {
       const pillHtml = r.pending === 0
         ? '<span class="pill ok">Al día</span>'
-        : '<span class="pill due">Debe ' + fmt(r.pending) + ' €</span>';
-      html += '<tr><td>' + nameCell(r.name) + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + pillHtml + '</td></tr>';
+        : '<span class="pill due">Debe <span class="money">' + fmt(r.pending) + ' €</span></span>';
+      html += '<tr><td>' + nameCell(r.name) + '</td><td class="amt"><span class="money">' + fmt(r.paid) + ' €</span></td><td class="amt">' + pillHtml + '</td></tr>';
     });
     html += '</tbody></table></div>';
 
     html += '<div class="card chart-card">'
-      + '<div class="ch-head"><h2 class="ch">Fondo acumulado en el tiempo</h2><span class="ch-val">' + fmt(bal.balance) + ' €</span></div>'
+      + '<div class="ch-head"><h2 class="ch">Fondo acumulado en el tiempo</h2><span class="ch-val money">' + fmt(bal.balance) + ' €</span></div>'
       + '<div class="chart-wrap" id="chart-wrap"></div>'
       + '</div>';
 
@@ -919,7 +1002,7 @@ button{font-family:inherit}
   function kpiAnimated(target, suffix, l, cls) {
     const id = 'kpi-anim-' + (kpiAnimCounter++);
     pendingKpiAnimations.push({ id, target, suffix });
-    return '<div class="kpi ' + (cls || '') + '"><div class="n" id="' + id + '">0' + suffix + '</div><div class="l">' + l + '</div></div>';
+    return '<div class="kpi ' + (cls || '') + '"><div class="n money" id="' + id + '">0' + suffix + '</div><div class="l">' + l + '</div></div>';
   }
 
   function runPendingKpiAnimations() {
@@ -989,7 +1072,7 @@ button{font-family:inherit}
       const gy = padT + (plotH / gridSteps) * i;
       const val = Math.round((maxVal - (maxVal / gridSteps) * i) / 10) * 10;
       gridHtml += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy + '" stroke="var(--line)" stroke-width="1"/>'
-        + '<text x="' + (padL - 8) + '" y="' + (gy + 4) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + fmt(val) + '</text>';
+        + '<text class="money" x="' + (padL - 8) + '" y="' + (gy + 4) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + fmt(val) + '</text>';
     }
 
     const lastX = xs[xs.length - 1], lastY = ys[ys.length - 1];
@@ -1010,7 +1093,7 @@ button{font-family:inherit}
       + '<path d="' + areaPath + '" fill="url(#areaGrad)" stroke="none"/>'
       + '<path d="' + linePath + '" fill="none" stroke="url(#lineGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
       + '<circle cx="' + lastX + '" cy="' + lastY + '" r="5" fill="#7c5cff" stroke="#fff" stroke-width="2"/>'
-      + '<text x="' + Math.min(lastX, W - padR - 4) + '" y="' + Math.max(lastY - 14, padT - 6) + '" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">' + fmt(points[points.length - 1].total) + ' €</text>'
+      + '<text class="money" x="' + Math.min(lastX, W - padR - 4) + '" y="' + Math.max(lastY - 14, padT - 6) + '" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">' + fmt(points[points.length - 1].total) + ' €</text>'
       + '<circle id="hoverDot" cx="0" cy="0" r="5" fill="#7c5cff" stroke="#fff" stroke-width="2" style="opacity:0"/>'
       + '<line id="hoverLine" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + plotH) + '" stroke="var(--line)" stroke-width="1" style="opacity:0"/>'
       + '<rect x="' + padL + '" y="0" width="' + plotW + '" height="' + H + '" fill="transparent" id="hoverCatcher" style="cursor:crosshair"/>'
@@ -1044,7 +1127,7 @@ button{font-family:inherit}
       tip.style.top = (ys[nearest] * scaleY) + 'px';
       tip.style.opacity = '1';
       const label = points[nearest].date === 'Inicio' ? 'Inicio' : points[nearest].date;
-      tip.innerHTML = '<b>' + fmt(points[nearest].total) + ' €</b><div class="d">' + label + '</div>';
+      tip.innerHTML = '<b class="money">' + fmt(points[nearest].total) + ' €</b><div class="d">' + label + '</div>';
     });
     catcher.addEventListener('mouseleave', () => {
       hoverDot.style.opacity = '0';
@@ -1073,7 +1156,7 @@ button{font-family:inherit}
     html += '<div class="card"><table class="ltable"><thead><tr><th>Nombre</th><th class="amt">Pagado</th><th class="amt">Pendiente</th><th class="amt">Estado</th></tr></thead><tbody>';
     rows.forEach((r) => {
       const pillHtml = r.pending === 0 ? '<span class="pill ok">Al día</span>' : '<span class="pill due">Debe</span>';
-      html += '<tr><td>' + nameCell(r.name) + '</td><td class="amt">' + fmt(r.paid) + ' €</td><td class="amt">' + (r.pending === 0 ? '—' : fmt(r.pending) + ' €') + '</td><td class="amt">' + pillHtml + '</td></tr>';
+      html += '<tr><td>' + nameCell(r.name) + '</td><td class="amt"><span class="money">' + fmt(r.paid) + ' €</span></td><td class="amt">' + (r.pending === 0 ? '—' : '<span class="money">' + fmt(r.pending) + ' €</span>') + '</td><td class="amt">' + pillHtml + '</td></tr>';
     });
     html += '</tbody></table></div>';
 
@@ -1116,7 +1199,7 @@ button{font-family:inherit}
       html += '<tr>'
         + '<td>' + t.date + '</td>'
         + '<td style="white-space:normal">' + escapeHtml(t.reason || '') + '</td>'
-        + '<td class="amt" style="color:var(--red)">−' + fmt(t.amount) + ' €</td>'
+        + '<td class="amt" style="color:var(--red)">−<span class="money">' + fmt(t.amount) + ' €</span></td>'
         + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
         + '<td>' + proofCell + '</td>'
         + '<td><button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button></td>'
@@ -1145,7 +1228,7 @@ button{font-family:inherit}
         : '<button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button>';
       html += '<tr>'
         + '<td>' + t.date + '</td>'
-        + '<td class="amt">+' + fmt(t.amount) + ' €</td>'
+        + '<td class="amt">+<span class="money">' + fmt(t.amount) + ' €</span></td>'
         + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
         + '<td>' + proofCell + '</td>'
         + '<td>' + actionCell + '</td>'
@@ -1177,7 +1260,7 @@ button{font-family:inherit}
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al registrar el retiro');
 
-      msg.innerHTML = '<div class="msg ok">Retiro de ' + amount + ' € registrado (' + reason + ').</div>';
+      msg.innerHTML = '<div class="msg ok">Retiro de <span class="money">' + amount + ' €</span> registrado (' + reason + ').</div>';
       document.getElementById('wd-reason').value = '';
       document.getElementById('wd-amount').value = '';
       document.getElementById('wd-note').value = '';
@@ -1235,7 +1318,7 @@ button{font-family:inherit}
         + '<button type="button" class="member-header" onclick="toggleMemberHistory(\'' + m + '\')">'
         + avatar(m)
         + '<span class="info"><span class="n">' + m + '</span><span class="s">' + list.length + (list.length === 1 ? ' aporte' : ' aportes') + '</span></span>'
-        + '<span class="total">' + fmt(total) + ' €</span>'
+        + '<span class="total money">' + fmt(total) + ' €</span>'
         + '<span class="member-chevron' + (isOpen ? ' open' : '') + '" id="chevron-' + m + '">▾</span>'
         + '</button>'
         + '<div class="member-panel' + (isOpen ? ' open' : '') + '" id="panel-' + m + '">'
@@ -1263,7 +1346,7 @@ button{font-family:inherit}
         : '<button class="x" title="Eliminar" onclick="deleteTransaction(\'' + t.id + '\')">✕</button>';
       html += '<tr>'
         + '<td>' + t.date + '</td>'
-        + '<td class="amt">' + fmt(t.amount) + ' €</td>'
+        + '<td class="amt"><span class="money">' + fmt(t.amount) + ' €</span></td>'
         + '<td style="color:var(--muted);white-space:normal">' + (t.note ? escapeHtml(t.note) : '—') + '</td>'
         + '<td>' + proofCell + '</td>'
         + '<td>' + actionCell + '</td>'
@@ -1310,13 +1393,13 @@ button{font-family:inherit}
   }
 
   let selectedProof = null; // { base64, name, type }
-  const MAX_PROOF_BYTES = 4 * 1024 * 1024; // 4MB — stays under the function's request-body limit once base64-encoded
+  const MAX_PROOF_BYTES = 3 * 1024 * 1024; // 3MB — stays under Vercel's ~4.5MB request-body limit once base64-encoded
 
   // Shared by the deposit and withdrawal forms: reads a file into base64 + a data URL for preview.
   function readProofFile(file) {
     return new Promise((resolve, reject) => {
       if (file.size > MAX_PROOF_BYTES) {
-        reject(new Error('El archivo pesa demasiado (máx. 4MB).'));
+        reject(new Error('El archivo pesa demasiado (máx. 3MB).'));
         return;
       }
       const reader = new FileReader();
@@ -1397,7 +1480,7 @@ button{font-family:inherit}
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al registrar el aporte');
 
-      msg.innerHTML = '<div class="msg ok">Aporte de ' + amount + ' € registrado para ' + name + '.</div>';
+      msg.innerHTML = '<div class="msg ok">Aporte de <span class="money">' + amount + ' €</span> registrado para ' + name + '.</div>';
       document.getElementById('dep-note').value = '';
       clearProofSelection();
       await loadData();
